@@ -1,10 +1,18 @@
 from fastapi import FastAPI
-
 from app.config import get_settings
+from app.database import Base, engine
+from app.models import Company
+from app.routers.companies import router as companies_router
 from app.schemas.health import HealthResponse
 
 
 settings = get_settings()
+
+# WHY:
+# Importing Company registers its table metadata with SQLAlchemy's Base.
+# create_all() then creates any missing tables in the configured database.
+Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -14,6 +22,11 @@ app = FastAPI(
     ),
     version=settings.app_version,
 )
+
+# WHY:
+# Routers keep endpoint definitions organized by resource instead of
+# placing every API route directly inside main.py.
+app.include_router(companies_router)
 
 
 @app.get(
@@ -35,3 +48,4 @@ def get_health() -> HealthResponse:
         version=settings.app_version,
         environment=settings.app_env,
     )
+

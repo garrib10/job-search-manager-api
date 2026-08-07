@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,13 +8,19 @@ class Settings(BaseSettings):
     """
     Central application configuration.
 
-    Environment variables keep deployment-specific values outside the
-    source code. Railway can provide the same variables in production.
+    Values are loaded from environment variables so local development
+    and production can use different settings without changing code.
     """
 
     app_name: str = "Job Search Manager API"
     app_version: str = "0.1.0"
     app_env: str = "development"
+
+    db_host: str
+    db_port: int = 3306
+    db_name: str
+    db_user: str
+    db_password: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -21,12 +28,22 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @property
+    def database_url(self) -> str:
+        """
+        Build the SQLAlchemy connection URL from environment variables.
+
+        quote_plus safely encodes special characters in the password.
+        """
+        encoded_password = quote_plus(self.db_password)
+
+        return (
+            f"mysql+pymysql://{self.db_user}:{encoded_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
+
 
 @lru_cache
 def get_settings() -> Settings:
-    """
-    Create the settings object once and reuse it.
-
-    Configuration does not need to be reread for every HTTP request.
-    """
+    """Create and reuse one Settings object."""
     return Settings()
