@@ -1,9 +1,12 @@
 from datetime import datetime
-
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
-
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.application import JobApplication
+
 
 
 class Company(Base):
@@ -62,3 +65,7 @@ class Company(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    applications: Mapped[list["JobApplication"]] = relationship(
+    back_populates="company",
+)

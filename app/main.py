@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from app.config import get_settings
 from app.database import Base, engine
-from app.models import Company
+from app.models import Company, JobApplication
 from app.routers.companies import router as companies_router
 from app.schemas.health import HealthResponse
-
+from app.routers.applications import router as applications_router
 
 settings = get_settings()
 
@@ -27,6 +27,7 @@ app = FastAPI(
 # Routers keep endpoint definitions organized by resource instead of
 # placing every API route directly inside main.py.
 app.include_router(companies_router)
+app.include_router(applications_router)
 
 
 @app.get(

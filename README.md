@@ -48,6 +48,20 @@ interviews, follow-ups, and job-search priorities.
 - 404 and 422 error handling verified
 - End-to-end CRUD testing completed with MySQL persistence
 
+### Day 3 Job Application Management
+
+- JobApplication ORM model implemented
+- Company ↔ JobApplication relationship established
+- ApplicationStatus and WorkArrangement enums added
+- Job Application request and response schemas implemented
+- Application service layer implemented
+- Application router implemented
+- Full Job Application CRUD endpoints implemented
+- Foreign key validation added
+- Duplicate job URL validation added
+- End-to-end CRUD testing completed
+- MySQL relationship verification completed
+
 ## Current Endpoints
 
 ### Health
@@ -65,6 +79,16 @@ interviews, follow-ups, and job-search priorities.
 | GET    | `/companies/{company_id}` | Retrieve a company by ID   |
 | PUT    | `/companies/{company_id}` | Update an existing company |
 | DELETE | `/companies/{company_id}` | Delete a company           |
+
+### Job Applications
+
+| Method | Endpoint                         | Description                        |
+| ------ | -------------------------------- | ---------------------------------- |
+| POST   | `/applications`                  | Create a new job application       |
+| GET    | `/applications`                  | Retrieve all job applications      |
+| GET    | `/applications/{application_id}` | Retrieve a job application by ID   |
+| PUT    | `/applications/{application_id}` | Update an existing job application |
+| DELETE | `/applications/{application_id}` | Delete a job application           |
 
 ## Requirements
 
