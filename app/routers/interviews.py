@@ -1,7 +1,20 @@
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from datetime import datetime
+from typing import Annotated, Literal
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.enums import (
+    InterviewOutcome,
+    InterviewStatus,
+    InterviewType,
+)
 from app.schemas import (
     InterviewCreate,
     InterviewResponse,
@@ -56,14 +69,47 @@ def create_interview(
 @router.get(
     "",
     response_model=list[InterviewResponse],
-    summary="List all interviews",
+    summary="List interviews",
 )
 def get_interviews(
     db: DatabaseSession,
+    application_id: int | None = None,
+    interview_type: InterviewType | None = None,
+    status_filter: InterviewStatus | None = None,
+    outcome: InterviewOutcome | None = None,
+    scheduled_from: datetime | None = None,
+    scheduled_to: datetime | None = None,
+    sort_order: Literal["asc", "desc"] = "asc",
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+    ),
+    offset: int = Query(
+        default=0,
+        ge=0,
+    ),
 ) -> list[InterviewResponse]:
-    """Return all interviews."""
+    """
+    Return interviews using optional filtering, sorting, and pagination.
 
-    return interview_service.get_interviews(db)
+    WHY:
+    Query parameters allow clients to narrow interview results without
+    requiring separate endpoints for each possible combination.
+    """
+
+    return interview_service.get_interviews(
+        db,
+        application_id=application_id,
+        interview_type=interview_type,
+        status_filter=status_filter,
+        outcome=outcome,
+        scheduled_from=scheduled_from,
+        scheduled_to=scheduled_to,
+        sort_order=sort_order,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
@@ -167,4 +213,3 @@ def delete_interview(
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
     )
-

@@ -1,5 +1,12 @@
+from datetime import datetime
+from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.enums import (
+    InterviewOutcome,
+    InterviewStatus,
+    InterviewType,
+)
 from app.models import Interview, JobApplication
 from app.schemas import InterviewCreate, InterviewUpdate
 
@@ -50,21 +57,68 @@ def create_interview(
 
 def get_interviews(
     db: Session,
+    application_id: int | None = None,
+    interview_type: InterviewType | None = None,
+    status_filter: InterviewStatus | None = None,
+    outcome: InterviewOutcome | None = None,
+    scheduled_from: datetime | None = None,
+    scheduled_to: datetime | None = None,
+    sort_order: Literal["asc", "desc"] = "asc",
+    limit: int = 20,
+    offset: int = 0,
 ) -> list[Interview]:
     """
-    Return all interviews ordered by scheduled date and time.
+    Return interviews using optional filtering, sorting, and pagination.
 
     WHY:
-    Interview records are naturally time-based, so chronological
-    ordering makes the results easier to work with.
+    Building the SQLAlchemy query conditionally allows the API to
+    combine several optional filters without creating separate
+    endpoints for each possible query.
     """
-    statement = (
-        select(Interview)
-        .order_by(
+    statement = select(Interview)
+
+    if application_id is not None:
+        statement = statement.where(
+            Interview.application_id == application_id
+        )
+
+    if interview_type is not None:
+        statement = statement.where(
+            Interview.interview_type == interview_type
+        )
+
+    if status_filter is not None:
+        statement = statement.where(
+            Interview.status == status_filter
+        )
+
+    if outcome is not None:
+        statement = statement.where(
+            Interview.outcome == outcome
+        )
+
+    if scheduled_from is not None:
+        statement = statement.where(
+            Interview.scheduled_at >= scheduled_from
+        )
+
+    if scheduled_to is not None:
+        statement = statement.where(
+            Interview.scheduled_at <= scheduled_to
+        )
+
+    if sort_order == "asc":
+        statement = statement.order_by(
             Interview.scheduled_at.asc(),
             Interview.id.asc(),
         )
-    )
+    else:
+        statement = statement.order_by(
+            Interview.scheduled_at.desc(),
+            Interview.id.desc(),
+        )
+
+    statement = statement.limit(limit).offset(offset)
 
     return list(db.scalars(statement).all())
 

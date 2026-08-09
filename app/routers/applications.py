@@ -1,7 +1,16 @@
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from datetime import date
+from typing import Annotated, Literal
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.enums import ApplicationStatus, WorkArrangement
 from app.schemas import (
     JobApplicationCreate,
     JobApplicationResponse,
@@ -63,16 +72,63 @@ def create_application(
 @router.get(
     "",
     response_model=list[JobApplicationResponse],
-    summary="List all job applications",
+    summary="List job applications",
 )
 def get_applications(
     db: DatabaseSession,
+    status_filter: ApplicationStatus | None = None,
+    company_id: int | None = None,
+    company: str | None = None,
+    location: str | None = None,
+    work_arrangement: WorkArrangement | None = None,
+    search: str | None = None,
+    date_applied_from: date | None = None,
+    date_applied_to: date | None = None,
+    sort_by: Literal[
+        "date_saved",
+        "date_applied",
+        "created_at",
+        "job_title",
+        "salary_min",
+        "salary_max",
+    ] = "date_saved",
+    sort_order: Literal["asc", "desc"] = "desc",
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+    ),
+    offset: int = Query(
+        default=0,
+        ge=0,
+    ),
 ) -> list[JobApplicationResponse]:
     """
-    Return every job application.
+    Return job applications.
+
+    WHY:
+    Query parameters define the filtering, searching, sorting,
+    and pagination options supported by the API.
+
+    The service layer will apply these values to the SQLAlchemy
+    query in the next milestone.
     """
 
-    return application_service.get_applications(db)
+    return application_service.get_applications(
+    db,
+    status_filter=status_filter,
+    company_id=company_id,
+    company=company,
+    location=location,
+    work_arrangement=work_arrangement,
+    search=search,
+    date_applied_from=date_applied_from,
+    date_applied_to=date_applied_to,
+    sort_by=sort_by,
+    sort_order=sort_order,
+    limit=limit,
+    offset=offset,
+)
 
 
 @router.get(
@@ -191,3 +247,4 @@ def delete_application(
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
     )
+

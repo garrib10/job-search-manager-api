@@ -75,6 +75,20 @@ interviews, follow-ups, and job-search priorities.
 - End-to-end CRUD testing completed
 - MySQL relationship verification completed
 
+### Day 5 Search & Filtering
+
+- Added application filtering
+- Added interview filtering
+- Added company name search
+- Added partial text search
+- Added application date range filtering
+- Added interview scheduled date filtering
+- Added sorting
+- Added pagination
+- Added multi-filter support
+- Added validation for invalid filter values
+- Verified filters against MySQL
+
 ## Current Endpoints
 
 ### Health
@@ -103,6 +117,21 @@ interviews, follow-ups, and job-search priorities.
 | PUT    | `/applications/{application_id}` | Update an existing job application |
 | DELETE | `/applications/{application_id}` | Delete a job application           |
 
+#### Query Parameters (GET /applications)
+
+- status_filter
+- company_id
+- company
+- location
+- work_arrangement
+- search
+- date_applied_from
+- date_applied_to
+- sort_by
+- sort_order
+- limit
+- offset
+
 ### Interviews
 
 | Method | Endpoint                     | Description                  |
@@ -112,6 +141,60 @@ interviews, follow-ups, and job-search priorities.
 | GET    | `/interviews/{interview_id}` | Retrieve an interview by ID  |
 | PUT    | `/interviews/{interview_id}` | Update an existing interview |
 | DELETE | `/interviews/{interview_id}` | Delete an interview          |
+
+#### Query Parameters (GET /interviews)
+
+- application_id
+- interview_type
+- status_filter
+- outcome
+- scheduled_from
+- scheduled_to
+- sort_order
+- limit
+- offset
+
+### Example Requests
+
+### Applications
+
+```http
+GET /applications?status_filter=saved
+```
+
+```http
+GET /applications?company=Stripe
+```
+
+```http
+GET /applications?search=Python
+```
+
+```http
+GET /applications?work_arrangement=hybrid
+```
+
+```http
+GET /applications?limit=10&offset=0
+```
+
+### Interviews
+
+```http
+GET /interviews?status_filter=scheduled
+```
+
+```http
+GET /interviews?application_id=2
+```
+
+```http
+GET /interviews?interview_type=behavioral
+```
+
+```http
+GET /interviews?scheduled_from=2026-08-01T00:00:00
+```
 
 ## Requirements
 
