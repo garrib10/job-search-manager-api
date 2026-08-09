@@ -7,9 +7,13 @@ from app.enums import (
     InterviewStatus,
     InterviewType,
 )
+from app.exceptions import (
+    ConflictException,
+    NotFoundException,
+    ValidationException,
+)
 from app.models import Interview, JobApplication
 from app.schemas import InterviewCreate, InterviewUpdate
-
 
 def get_application_by_id(
     db: Session,
@@ -19,12 +23,50 @@ def get_application_by_id(
     Return a job application by primary key.
 
     WHY:
-    Every interview must reference an existing JobApplication.
-    The router can use this lookup before creating or updating
-    an interview.
+    Nullable lookup helpers remain useful when the caller wants to
+    inspect whether an application exists without immediately treating
+    its absence as an error.
     """
     return db.get(JobApplication, application_id)
 
+def require_interview_by_id(
+    db: Session,
+    interview_id: int,
+) -> Interview:
+    """
+    Return an interview or raise a not-found exception.
+
+    WHY:
+    Resource existence checks belong in the service layer.
+    The global exception handler converts this exception into
+    a consistent 404 HTTP response.
+    """
+    interview = db.get(Interview, interview_id)
+
+    if interview is None:
+        raise NotFoundException("Interview not found")
+
+    return interview
+
+def get_interview_by_application_and_time(
+    db: Session,
+    application_id: int,
+    scheduled_at: datetime,
+) -> Interview | None:
+    """
+    Return an interview scheduled for the same application
+    at the exact same date and time.
+
+    WHY:
+    This lookup supports duplicate scheduling protection while still
+    allowing different applications to have interviews at the same time.
+    """
+    statement = select(Interview).where(
+        Interview.application_id == application_id,
+        Interview.scheduled_at == scheduled_at,
+    )
+
+    return db.scalar(statement)
 
 def create_interview(
     db: Session,
@@ -34,9 +76,29 @@ def create_interview(
     Create and persist a new interview.
 
     WHY:
-    Database write logic belongs in the service layer so the router
-    can remain focused on HTTP requests, responses, and status codes.
+    The service layer owns database-dependent business rules,
+    including validating the JobApplication relationship and
+    preventing duplicate interview scheduling.
     """
+    application = db.get(
+        JobApplication,
+        interview_data.application_id,
+    )
+
+    if application is None:
+        raise NotFoundException("Job application not found")
+
+    existing_interview = get_interview_by_application_and_time(
+        db,
+        interview_data.application_id,
+        interview_data.scheduled_at,
+    )
+
+    if existing_interview is not None:
+        raise ConflictException(
+            "An interview is already scheduled for this application at that time"
+        )
+
     interview = Interview(
         application_id=interview_data.application_id,
         interview_type=interview_data.interview_type,
@@ -53,7 +115,6 @@ def create_interview(
     db.refresh(interview)
 
     return interview
-
 
 def get_interviews(
     db: Session,
@@ -75,6 +136,15 @@ def get_interviews(
     combine several optional filters without creating separate
     endpoints for each possible query.
     """
+    if (
+        scheduled_from is not None
+        and scheduled_to is not None
+        and scheduled_from > scheduled_to
+    ):
+        raise ValidationException(
+            "scheduled_from cannot be after scheduled_to"
+        )
+
     statement = select(Interview)
 
     if application_id is not None:
@@ -122,14 +192,13 @@ def get_interviews(
 
     return list(db.scalars(statement).all())
 
-
 def get_interview_by_id(
     db: Session,
     interview_id: int,
 ) -> Interview | None:
     """Return one interview by primary key."""
-    return db.get(Interview, interview_id)
 
+    return db.get(Interview, interview_id)
 
 def update_interview(
     db: Session,
@@ -140,9 +209,31 @@ def update_interview(
     Update an existing interview.
 
     WHY:
-    The project currently uses PUT semantics, so all editable
-    interview fields are replaced by the values in the request.
+    The service validates database-dependent business rules before
+    applying the PUT update.
     """
+    application = db.get(
+        JobApplication,
+        interview_data.application_id,
+    )
+
+    if application is None:
+        raise NotFoundException("Job application not found")
+
+    existing_interview = get_interview_by_application_and_time(
+        db,
+        interview_data.application_id,
+        interview_data.scheduled_at,
+    )
+
+    if (
+        existing_interview is not None
+        and existing_interview.id != interview.id
+    ):
+        raise ConflictException(
+            "An interview is already scheduled for this application at that time"
+        )
+
     interview.application_id = interview_data.application_id
     interview.interview_type = interview_data.interview_type
     interview.status = interview_data.status
@@ -157,11 +248,11 @@ def update_interview(
 
     return interview
 
-
 def delete_interview(
     db: Session,
     interview: Interview,
 ) -> None:
     """Delete an existing interview."""
+
     db.delete(interview)
     db.commit()

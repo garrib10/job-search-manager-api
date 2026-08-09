@@ -3,9 +3,13 @@ from typing import Literal
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from app.enums import ApplicationStatus, WorkArrangement
+from app.exceptions import (
+    ConflictException,
+    NotFoundException,
+    ValidationException,
+)
 from app.models import Company, JobApplication
 from app.schemas import JobApplicationCreate, JobApplicationUpdate
-
 
 def get_company_by_id(
     db: Session,
@@ -15,8 +19,9 @@ def get_company_by_id(
     Return a company by primary key.
 
     WHY:
-    Job applications must reference a real company before they can
-    be created or updated.
+    Nullable lookup helpers are still useful in cases where the caller
+    may want to inspect whether a company exists without immediately
+    treating the absence as an error.
     """
     return db.get(Company, company_id)
 
@@ -38,6 +43,25 @@ def get_application_by_job_url(
 
     return db.scalar(statement)
 
+def require_application_by_id(
+    db: Session,
+    application_id: int,
+) -> JobApplication:
+    """
+    Return a job application or raise a not-found exception.
+
+    WHY:
+    Database-dependent existence checks belong in the service layer.
+    The global exception handler converts this exception into a
+    consistent 404 HTTP response.
+    """
+    application = db.get(JobApplication, application_id)
+
+    if application is None:
+        raise NotFoundException("Job application not found")
+
+    return application
+
 
 def create_application(
     db: Session,
@@ -47,9 +71,29 @@ def create_application(
     Create and persist a new job application.
 
     WHY:
-    Database write logic belongs in the service layer so routers stay
-    focused on HTTP requests, responses, and status codes.
+    The service layer owns database-dependent business rules such as
+    validating the referenced company and preventing duplicate job URLs.
     """
+    company = db.get(
+        Company,
+        application_data.company_id,
+    )
+
+    if company is None:
+        raise NotFoundException("Company not found")
+
+    job_url = str(application_data.job_url)
+
+    existing_application = get_application_by_job_url(
+        db,
+        job_url,
+    )
+
+    if existing_application is not None:
+        raise ConflictException(
+            "An application with this job URL already exists"
+        )
+
     application = JobApplication(
         job_title=application_data.job_title,
         company_id=application_data.company_id,
@@ -57,7 +101,7 @@ def create_application(
         work_arrangement=application_data.work_arrangement,
         salary_min=application_data.salary_min,
         salary_max=application_data.salary_max,
-        job_url=str(application_data.job_url),
+        job_url=job_url,
         status=application_data.status,
         notes=application_data.notes,
         date_applied=application_data.date_applied,
@@ -101,6 +145,16 @@ def get_applications(
     optional filters without creating separate endpoints for every
     possible search combination.
     """
+
+    if (
+        date_applied_from is not None
+        and date_applied_to is not None
+        and date_applied_from > date_applied_to
+    ):
+        raise ValidationException(
+            "date_applied_from cannot be after date_applied_to"
+        )
+
     statement = select(JobApplication)
 
     if status_filter is not None:
@@ -193,16 +247,39 @@ def update_application(
     Update an existing job application.
 
     WHY:
-    This project currently uses PUT semantics, so the editable fields
-    are replaced using the complete update request.
+    The service validates database-dependent business rules before
+    applying the PUT update.
     """
+    company = db.get(
+        Company,
+        application_data.company_id,
+    )
+
+    if company is None:
+        raise NotFoundException("Company not found")
+
+    job_url = str(application_data.job_url)
+
+    existing_application = get_application_by_job_url(
+        db,
+        job_url,
+    )
+
+    if (
+        existing_application is not None
+        and existing_application.id != application.id
+    ):
+        raise ConflictException(
+            "An application with this job URL already exists"
+        )
+
     application.job_title = application_data.job_title
     application.company_id = application_data.company_id
     application.location = application_data.location
     application.work_arrangement = application_data.work_arrangement
     application.salary_min = application_data.salary_min
     application.salary_max = application_data.salary_max
-    application.job_url = str(application_data.job_url)
+    application.job_url = job_url
     application.status = application_data.status
     application.notes = application_data.notes
     application.date_applied = application_data.date_applied
@@ -218,5 +295,6 @@ def delete_application(
     application: JobApplication,
 ) -> None:
     """Delete an existing job application."""
+
     db.delete(application)
     db.commit()

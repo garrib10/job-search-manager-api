@@ -3,7 +3,6 @@ from typing import Annotated, Literal
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
     Query,
     Response,
     status,
@@ -39,30 +38,11 @@ def create_application(
 ) -> JobApplicationResponse:
     """
     Create a new job application.
+
+    WHY:
+    Database-dependent business rules, such as company existence
+    and duplicate job URL checks, are handled by the service layer.
     """
-
-    company = application_service.get_company_by_id(
-        db,
-        application_data.company_id,
-    )
-
-    if company is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found",
-        )
-
-    existing_application = application_service.get_application_by_job_url(
-        db,
-        str(application_data.job_url),
-    )
-
-    if existing_application is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An application with this job URL already exists",
-        )
-
     return application_service.create_application(
         db,
         application_data,
@@ -104,31 +84,24 @@ def get_applications(
     ),
 ) -> list[JobApplicationResponse]:
     """
-    Return job applications.
-
-    WHY:
-    Query parameters define the filtering, searching, sorting,
-    and pagination options supported by the API.
-
-    The service layer will apply these values to the SQLAlchemy
-    query in the next milestone.
+    Return job applications using filtering, searching,
+    sorting, and pagination.
     """
-
     return application_service.get_applications(
-    db,
-    status_filter=status_filter,
-    company_id=company_id,
-    company=company,
-    location=location,
-    work_arrangement=work_arrangement,
-    search=search,
-    date_applied_from=date_applied_from,
-    date_applied_to=date_applied_to,
-    sort_by=sort_by,
-    sort_order=sort_order,
-    limit=limit,
-    offset=offset,
-)
+        db,
+        status_filter=status_filter,
+        company_id=company_id,
+        company=company,
+        location=location,
+        work_arrangement=work_arrangement,
+        search=search,
+        date_applied_from=date_applied_from,
+        date_applied_to=date_applied_to,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
@@ -142,20 +115,15 @@ def get_application(
 ) -> JobApplicationResponse:
     """
     Return one job application by ID.
-    """
 
-    application = application_service.get_application_by_id(
+    WHY:
+    The service layer handles the existence check and raises
+    NotFoundException when the application does not exist.
+    """
+    return application_service.require_application_by_id(
         db,
         application_id,
     )
-
-    if application is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job application not found",
-        )
-
-    return application
 
 
 @router.put(
@@ -170,43 +138,15 @@ def update_application(
 ) -> JobApplicationResponse:
     """
     Update an existing job application.
-    """
 
-    application = application_service.get_application_by_id(
+    WHY:
+    The router retrieves the required resource, while the service
+    layer owns company validation and duplicate URL checks.
+    """
+    application = application_service.require_application_by_id(
         db,
         application_id,
     )
-
-    if application is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job application not found",
-        )
-
-    company = application_service.get_company_by_id(
-        db,
-        application_data.company_id,
-    )
-
-    if company is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found",
-        )
-
-    existing_application = application_service.get_application_by_job_url(
-        db,
-        str(application_data.job_url),
-    )
-
-    if (
-        existing_application is not None
-        and existing_application.id != application_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An application with this job URL already exists",
-        )
 
     return application_service.update_application(
         db,
@@ -227,17 +167,10 @@ def delete_application(
     """
     Delete an existing job application.
     """
-
-    application = application_service.get_application_by_id(
+    application = application_service.require_application_by_id(
         db,
         application_id,
     )
-
-    if application is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job application not found",
-        )
 
     application_service.delete_application(
         db,
@@ -247,4 +180,3 @@ def delete_application(
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
     )
-

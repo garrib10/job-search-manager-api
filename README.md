@@ -89,6 +89,17 @@ interviews, follow-ups, and job-search priorities.
 - Added validation for invalid filter values
 - Verified filters against MySQL
 
+### Day 6 Validation & Error Handling
+
+- Added custom exception classes
+- Added global exception handlers
+- Moved business validation into the service layer
+- Added duplicate interview scheduling validation
+- Added application date-range validation
+- Added interview date-range validation
+- Verified all validation paths
+- Completed end-to-end regression testing
+
 ## Current Endpoints
 
 ### Health

@@ -1,12 +1,9 @@
 from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.schemas import CompanyCreate, CompanyResponse, CompanyUpdate
 from app.services import company_service
-
 
 router = APIRouter(
     prefix="/companies",
@@ -33,7 +30,10 @@ def create_company(
     The router handles HTTP concerns while the service layer handles
     persistence and business logic.
     """
-    return company_service.create_company(db, company_data)
+    return company_service.create_company(
+        db,
+        company_data,
+    )
 
 
 @router.get(
@@ -45,6 +45,7 @@ def get_companies(
     db: DatabaseSession,
 ) -> list[CompanyResponse]:
     """Return all companies."""
+
     return company_service.get_companies(db)
 
 
@@ -57,16 +58,18 @@ def get_company(
     company_id: int,
     db: DatabaseSession,
 ) -> CompanyResponse:
-    """Return one company by ID."""
-    company = company_service.get_company_by_id(db, company_id)
+    """
+    Return one company by ID.
 
-    if company is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found",
-        )
-
-    return company
+    WHY:
+    The service layer owns the existence check. If the company does
+    not exist, it raises NotFoundException and the global handler
+    converts that exception into a 404 response.
+    """
+    return company_service.require_company_by_id(
+        db,
+        company_id,
+    )
 
 
 @router.put(
@@ -80,13 +83,11 @@ def update_company(
     db: DatabaseSession,
 ) -> CompanyResponse:
     """Update an existing company."""
-    company = company_service.get_company_by_id(db, company_id)
 
-    if company is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found",
-        )
+    company = company_service.require_company_by_id(
+        db,
+        company_id,
+    )
 
     return company_service.update_company(
         db,
@@ -105,14 +106,17 @@ def delete_company(
     db: DatabaseSession,
 ) -> Response:
     """Delete an existing company."""
-    company = company_service.get_company_by_id(db, company_id)
 
-    if company is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found",
-        )
+    company = company_service.require_company_by_id(
+        db,
+        company_id,
+    )
 
-    company_service.delete_company(db, company)
+    company_service.delete_company(
+        db,
+        company,
+    )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
