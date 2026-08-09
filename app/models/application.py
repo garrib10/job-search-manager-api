@@ -17,6 +17,7 @@ from app.enums import ApplicationStatus, WorkArrangement
 
 if TYPE_CHECKING:
     from app.models.company import Company
+    from app.models.interview import Interview
 
 
 class JobApplication(Base):
@@ -122,3 +123,6 @@ class JobApplication(Base):
         back_populates="applications",
     )
 
+    interviews: Mapped[list["Interview"]] = relationship(
+        back_populates="application",
+    ) 

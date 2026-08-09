@@ -11,7 +11,12 @@ from app.schemas.company import (
     CompanyUpdate,
 )
 from app.schemas.health import HealthResponse
-
+from app.schemas.interview import (
+    InterviewBase,
+    InterviewCreate,
+    InterviewResponse,
+    InterviewUpdate,
+)
 
 __all__ = [
     "CompanyBase",
@@ -19,6 +24,10 @@ __all__ = [
     "CompanyResponse",
     "CompanyUpdate",
     "HealthResponse",
+    "InterviewBase",
+    "InterviewCreate",
+    "InterviewResponse",
+    "InterviewUpdate",
     "JobApplicationBase",
     "JobApplicationCreate",
     "JobApplicationResponse",

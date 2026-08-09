@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from app.config import get_settings
 from app.database import Base, engine
-from app.models import Company, JobApplication
+from app.models import Company, Interview, JobApplication
 from app.routers.companies import router as companies_router
 from app.schemas.health import HealthResponse
 from app.routers.applications import router as applications_router
+from app.routers.interviews import router as interviews_router
 
 settings = get_settings()
 
@@ -28,7 +29,7 @@ app = FastAPI(
 # placing every API route directly inside main.py.
 app.include_router(companies_router)
 app.include_router(applications_router)
-
+app.include_router(interviews_router)
 
 @app.get(
     "/health",

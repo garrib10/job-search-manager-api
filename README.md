@@ -62,6 +62,19 @@ interviews, follow-ups, and job-search priorities.
 - End-to-end CRUD testing completed
 - MySQL relationship verification completed
 
+### Day 4 Interview Management
+
+- Interview ORM model implemented
+- JobApplication ↔ Interview relationship established
+- InterviewType, InterviewStatus, and InterviewOutcome enums added
+- Interview request and response schemas implemented
+- Interview service layer implemented
+- Interview router implemented
+- Full Interview CRUD endpoints implemented
+- Job application relationship validation added
+- End-to-end CRUD testing completed
+- MySQL relationship verification completed
+
 ## Current Endpoints
 
 ### Health
@@ -89,6 +102,16 @@ interviews, follow-ups, and job-search priorities.
 | GET    | `/applications/{application_id}` | Retrieve a job application by ID   |
 | PUT    | `/applications/{application_id}` | Update an existing job application |
 | DELETE | `/applications/{application_id}` | Delete a job application           |
+
+### Interviews
+
+| Method | Endpoint                     | Description                  |
+| ------ | ---------------------------- | ---------------------------- |
+| POST   | `/interviews`                | Create a new interview       |
+| GET    | `/interviews`                | Retrieve all interviews      |
+| GET    | `/interviews/{interview_id}` | Retrieve an interview by ID  |
+| PUT    | `/interviews/{interview_id}` | Update an existing interview |
+| DELETE | `/interviews/{interview_id}` | Delete an interview          |
 
 ## Requirements
 
