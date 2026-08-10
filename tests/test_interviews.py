@@ -609,3 +609,65 @@ def test_update_interview_with_invalid_application(client):
     assert response.json() == {
         "detail": "Job application not found"
     }
+
+def test_filter_interviews_by_scheduled_from(client):
+    company = create_test_company(client)
+
+    application = create_test_application(
+        client,
+        company["id"],
+    )
+
+    create_test_interview(
+        client,
+        application["id"],
+        scheduled_at="2026-09-01T09:00:00",
+    )
+
+    create_test_interview(
+        client,
+        application["id"],
+        scheduled_at="2026-09-10T09:00:00",
+    )
+
+    response = client.get(
+        "/interviews?scheduled_from=2026-09-05T00:00:00"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["scheduled_at"].startswith("2026-09-10")
+
+def test_filter_interviews_by_scheduled_to(client):
+    company = create_test_company(client)
+
+    application = create_test_application(
+        client,
+        company["id"],
+    )
+
+    create_test_interview(
+        client,
+        application["id"],
+        scheduled_at="2026-09-01T09:00:00",
+    )
+
+    create_test_interview(
+        client,
+        application["id"],
+        scheduled_at="2026-09-10T09:00:00",
+    )
+
+    response = client.get(
+        "/interviews?scheduled_to=2026-09-05T23:59:59"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["scheduled_at"].startswith("2026-09-01")

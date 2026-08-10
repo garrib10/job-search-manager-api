@@ -19,14 +19,18 @@ interviews, follow-ups, and job-search priorities.
 - MySQL
 - PyMySQL
 - Pydantic
+- PyJWT
+- pwdlib (Argon2)
+- HTTP Bearer Authentication
 - Pytest
+- pytest-cov
 - HTTPX
 - Swagger/OpenAPI
 - Railway
 
 ## Current Status
 
-### Day 1 foundation:
+### Day 1: Foundation
 
 - FastAPI application initialized
 - Environment configuration added
@@ -34,7 +38,7 @@ interviews, follow-ups, and job-search priorities.
 - Swagger/OpenAPI documentation enabled
 - Virtual environment and dependencies configured
 
-### Day 2 Company Management
+### Day 2: Company Management
 
 - MySQL database connected
 - Dedicated application database user configured
@@ -48,7 +52,7 @@ interviews, follow-ups, and job-search priorities.
 - 404 and 422 error handling verified
 - End-to-end CRUD testing completed with MySQL persistence
 
-### Day 3 Job Application Management
+### Day 3: Job Application Management
 
 - JobApplication ORM model implemented
 - Company ↔ JobApplication relationship established
@@ -62,7 +66,7 @@ interviews, follow-ups, and job-search priorities.
 - End-to-end CRUD testing completed
 - MySQL relationship verification completed
 
-### Day 4 Interview Management
+### Day 4: Interview Management
 
 - Interview ORM model implemented
 - JobApplication ↔ Interview relationship established
@@ -75,7 +79,7 @@ interviews, follow-ups, and job-search priorities.
 - End-to-end CRUD testing completed
 - MySQL relationship verification completed
 
-### Day 5 Search & Filtering
+### Day 5: Search & Filtering
 
 - Added application filtering
 - Added interview filtering
@@ -89,7 +93,7 @@ interviews, follow-ups, and job-search priorities.
 - Added validation for invalid filter values
 - Verified filters against MySQL
 
-### Day 6 Validation & Error Handling
+### Day 6: Validation & Error Handling
 
 - Added custom exception classes
 - Added global exception handlers
@@ -100,7 +104,7 @@ interviews, follow-ups, and job-search priorities.
 - Verified all validation paths
 - Completed end-to-end regression testing
 
-### Day 7 Automated Testing & Quality Assurance
+### Day 7: Automated Testing & Quality Assurance
 
 - Implemented a dedicated MySQL test database
 - Configured Pytest with reusable fixtures
@@ -113,6 +117,21 @@ interviews, follow-ups, and job-search priorities.
 - Generated code coverage reports using pytest-cov
 - Achieved 55 automated tests with approximately 97% code coverage
 - Verified application stability through a full regression test suite
+
+### Day 8: Authentication
+
+- Added User ORM model
+- Added JWT authentication
+- Added Argon2 password hashing
+- Added authentication service layer
+- Added authentication router
+- Added user registration endpoint
+- Added user login endpoint
+- Added protected `/auth/me` endpoint
+- Added authentication middleware using HTTP Bearer tokens
+- Added automated authentication tests
+- Increased automated test suite to 76 tests
+- Increased code coverage to 98%
 
 ## Current Endpoints
 
@@ -179,6 +198,14 @@ interviews, follow-ups, and job-search priorities.
 - limit
 - offset
 
+#### Authentication
+
+| Method | Endpoint         | Description                     |
+| ------ | ---------------- | ------------------------------- |
+| POST   | `/auth/register` | Register a new user             |
+| POST   | `/auth/login`    | Authenticate a user             |
+| GET    | `/auth/me`       | Retrieve the authenticated user |
+
 ### Example Requests
 
 ### Applications
@@ -221,6 +248,44 @@ GET /interviews?interview_type=behavioral
 GET /interviews?scheduled_from=2026-08-01T00:00:00
 ```
 
+### Authentication
+
+```http
+POST /auth/register
+```
+
+```json
+{
+  "email": "user@example.com",
+  "password": "TestPassword123!"
+}
+```
+
+```http
+POST /auth/login
+```
+
+```json
+{
+  "email": "user@example.com",
+  "password": "TestPassword123!"
+}
+```
+
+Response
+
+```json
+{
+  "access_token": "...",
+  "token_type": "bearer"
+}
+```
+
+```http
+GET /auth/me
+Authorization: Bearer <JWT>
+```
+
 ## Requirements
 
 - Python 3.12+
@@ -251,6 +316,12 @@ Swagger UI:
 
 ```
 http://127.0.0.1:8000/docs
+```
+
+Run all tests
+
+```
+python -m pytest
 ```
 
 ## Roadmap

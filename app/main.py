@@ -11,8 +11,9 @@ from app.handlers import (
     not_found_exception_handler,
     validation_exception_handler,
 )
-from app.models import Company, Interview, JobApplication
+from app.models import Company, Interview, JobApplication, User
 from app.routers.applications import router as applications_router
+from app.routers.auth import router as auth_router
 from app.routers.companies import router as companies_router
 from app.routers.interviews import router as interviews_router
 from app.schemas.health import HealthResponse
@@ -23,7 +24,9 @@ settings = get_settings()
 # WHY:
 # Importing the models registers their table metadata with SQLAlchemy's Base.
 # create_all() then creates any missing tables in the configured database.
+
 Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -39,6 +42,7 @@ app = FastAPI(
 # Global exception handlers translate application-specific exceptions
 # into consistent HTTP responses without requiring services to depend
 # directly on FastAPI's HTTPException.
+
 app.add_exception_handler(
     NotFoundException,
     not_found_exception_handler,
@@ -58,9 +62,11 @@ app.add_exception_handler(
 # WHY:
 # Routers keep endpoint definitions organized by resource instead of
 # placing every API route directly inside main.py.
+
 app.include_router(companies_router)
 app.include_router(applications_router)
 app.include_router(interviews_router)
+app.include_router(auth_router)
 
 
 @app.get(
@@ -82,4 +88,3 @@ def get_health() -> HealthResponse:
         version=settings.app_version,
         environment=settings.app_env,
     )
-

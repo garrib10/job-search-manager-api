@@ -528,3 +528,127 @@ def test_update_application_with_invalid_company(client):
     assert response.json() == {
         "detail": "Company not found"
     }
+
+def test_filter_applications_by_location(client):
+    company = create_test_company(client)
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Boston Python Developer",
+        job_url="https://example.com/jobs/location-boston",
+        location="Boston, MA",
+    )
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Hartford Java Developer",
+        job_url="https://example.com/jobs/location-hartford",
+        location="Hartford, CT",
+    )
+
+    response = client.get(
+        "/applications?location=Boston"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["location"] == "Boston, MA"
+
+def test_filter_applications_by_work_arrangement(client):
+    company = create_test_company(client)
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Remote Python Developer",
+        job_url="https://example.com/jobs/work-remote",
+        work_arrangement="remote",
+    )
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Hybrid Java Developer",
+        job_url="https://example.com/jobs/work-hybrid",
+        work_arrangement="hybrid",
+    )
+
+    response = client.get(
+        "/applications?work_arrangement=remote"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["work_arrangement"] == "remote"
+
+def test_filter_applications_by_date_applied_from(client):
+    company = create_test_company(client)
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Earlier Application",
+        job_url="https://example.com/jobs/date-from-old",
+        status="applied",
+        date_applied="2026-08-01",
+    )
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Later Application",
+        job_url="https://example.com/jobs/date-from-new",
+        status="applied",
+        date_applied="2026-08-10",
+    )
+
+    response = client.get(
+        "/applications?date_applied_from=2026-08-05"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["job_title"] == "Later Application"
+
+def test_filter_applications_by_date_applied_to(client):
+    company = create_test_company(client)
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Earlier Application",
+        job_url="https://example.com/jobs/date-to-old",
+        status="applied",
+        date_applied="2026-08-01",
+    )
+
+    create_test_application(
+        client,
+        company["id"],
+        job_title="Later Application",
+        job_url="https://example.com/jobs/date-to-new",
+        status="applied",
+        date_applied="2026-08-10",
+    )
+
+    response = client.get(
+        "/applications?date_applied_to=2026-08-05"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["job_title"] == "Earlier Application"

@@ -17,6 +17,13 @@ from app.schemas.interview import (
     InterviewResponse,
     InterviewUpdate,
 )
+from app.schemas.user import (
+    Token,
+    TokenData,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 
 __all__ = [
     "CompanyBase",
@@ -32,4 +39,9 @@ __all__ = [
     "JobApplicationCreate",
     "JobApplicationResponse",
     "JobApplicationUpdate",
+    "Token",
+    "TokenData",
+    "UserCreate",
+    "UserLogin",
+    "UserResponse",
 ]

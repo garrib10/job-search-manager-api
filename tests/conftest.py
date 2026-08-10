@@ -7,8 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from app.database import Base, get_db
 from app.main import app
-from app.models import Company, Interview, JobApplication
-
+from app.models import Company, Interview, JobApplication, User
 
 load_dotenv()
 
@@ -67,7 +66,7 @@ def clean_database() -> Generator[None, None, None]:
         connection.execute(Interview.__table__.delete())
         connection.execute(JobApplication.__table__.delete())
         connection.execute(Company.__table__.delete())
-
+        connection.execute(User.__table__.delete())
 
 @pytest.fixture
 def db_session() -> Generator[Session, None, None]:
@@ -85,7 +84,6 @@ def db_session() -> Generator[Session, None, None]:
     finally:
         db.rollback()
         db.close()
-
 
 @pytest.fixture
 def client(
