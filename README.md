@@ -7,248 +7,246 @@
 ![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?logo=pytest&logoColor=white)
 ![Railway](https://img.shields.io/badge/Railway-0B0D0E?logo=railway&logoColor=white)
 
-A production-oriented REST API for managing companies, job applications,
-interviews, follow-ups, and job-search priorities.
+A production-ready REST API built with **FastAPI**, **SQLAlchemy**, and **MySQL** for managing the complete job search process. The API allows users to track companies, job applications, interviews, and authentication through secure JWT-based authorization.
+
+The project follows a layered architecture with separate routers, services, models, and schemas, includes automated testing with high code coverage, and is deployed to Railway with a production MySQL database.
+
+---
+
+## Live Demo
+
+| Resource        | URL                                                             |
+| --------------- | --------------------------------------------------------------- |
+| Production API  | https://job-search-manager-api-production.up.railway.app        |
+| Swagger UI      | https://job-search-manager-api-production.up.railway.app/docs   |
+| Health Endpoint | https://job-search-manager-api-production.up.railway.app/health |
+
+---
+
+## Key Features
+
+### Company Management
+
+- Create, update, retrieve, and delete companies
+- Store company website, industry, location, and notes
+- Prevent duplicate company records
+
+### Job Application Management
+
+- Track job applications
+- Associate applications with companies
+- Store salary ranges, work arrangement, application status, and notes
+- Prevent duplicate job postings using unique job URLs
+
+### Interview Management
+
+- Schedule interviews
+- Track interview type, status, and outcome
+- Prevent duplicate interview scheduling
+- Associate interviews with job applications
+
+### Authentication
+
+- User registration
+- Secure password hashing with Argon2
+- JWT access tokens
+- Protected endpoints using HTTP Bearer Authentication
+
+### Search & Filtering
+
+Job Applications
+
+- Status
+- Company
+- Location
+- Work Arrangement
+- Date Applied
+- Full-text search
+- Sorting
+- Pagination
+
+Interviews
+
+- Application
+- Interview Type
+- Status
+- Outcome
+- Scheduled Date
+- Sorting
+- Pagination
+
+### Validation & Error Handling
+
+- Global exception handlers
+- Request validation with Pydantic
+- Duplicate resource detection
+- Foreign key validation
+- Date-range validation
+- Consistent API error responses
+
+### Automated Testing
+
+- 70 automated tests
+- 98% code coverage
+- Dedicated MySQL test database
+- CRUD endpoint testing
+- JWT authentication testing
+- End-to-end API workflow testing
+
+---
 
 ## Tech Stack
 
+### Backend
+
 - Python 3.12+
 - FastAPI
-- Uvicorn
 - SQLAlchemy
 - MySQL
 - PyMySQL
-- Pydantic
+
+### Authentication
+
 - PyJWT
 - pwdlib (Argon2)
 - HTTP Bearer Authentication
+
+### Validation
+
+- Pydantic
+- pydantic-settings
+
+### Testing
+
 - Pytest
 - pytest-cov
 - HTTPX
-- Swagger/OpenAPI
+
+### Documentation
+
+- Swagger / OpenAPI
+
+### Deployment
+
 - Railway
 
-## Current Status
+---
 
-### Day 1: Foundation
+## Architecture
 
-- FastAPI application initialized
-- Environment configuration added
-- Health-check endpoint added
-- Swagger/OpenAPI documentation enabled
-- Virtual environment and dependencies configured
+```
+Client
+      │
+      ▼
+FastAPI Routers
+      │
+      ▼
+Service Layer
+      │
+      ▼
+SQLAlchemy ORM
+      │
+      ▼
+MySQL Database
+```
 
-### Day 2: Company Management
+The application follows a layered architecture that separates routing, business logic, validation, and database access to improve maintainability and testability.
 
-- MySQL database connected
-- Dedicated application database user configured
-- SQLAlchemy engine and session management added
-- Company ORM model implemented
-- Company request and response schemas implemented
-- Company service layer implemented
-- Company router implemented
-- Full Company CRUD endpoints implemented
-- Pydantic request validation added
-- 404 and 422 error handling verified
-- End-to-end CRUD testing completed with MySQL persistence
+---
 
-### Day 3: Job Application Management
+## Project Structure
 
-- JobApplication ORM model implemented
-- Company ↔ JobApplication relationship established
-- ApplicationStatus and WorkArrangement enums added
-- Job Application request and response schemas implemented
-- Application service layer implemented
-- Application router implemented
-- Full Job Application CRUD endpoints implemented
-- Foreign key validation added
-- Duplicate job URL validation added
-- End-to-end CRUD testing completed
-- MySQL relationship verification completed
+```text
+app/
+│
+├── models/
+├── routers/
+├── schemas/
+├── services/
+├── database.py
+├── security.py
+├── exceptions.py
+├── handlers.py
+├── config.py
+└── main.py
 
-### Day 4: Interview Management
+tests/
+│
+├── conftest.py
+├── test_auth.py
+├── test_companies.py
+├── test_applications.py
+├── test_interviews.py
+└── ...
+```
 
-- Interview ORM model implemented
-- JobApplication ↔ Interview relationship established
-- InterviewType, InterviewStatus, and InterviewOutcome enums added
-- Interview request and response schemas implemented
-- Interview service layer implemented
-- Interview router implemented
-- Full Interview CRUD endpoints implemented
-- Job application relationship validation added
-- End-to-end CRUD testing completed
-- MySQL relationship verification completed
+---
 
-### Day 5: Search & Filtering
+## Screenshots
 
-- Added application filtering
-- Added interview filtering
-- Added company name search
-- Added partial text search
-- Added application date range filtering
-- Added interview scheduled date filtering
-- Added sorting
-- Added pagination
-- Added multi-filter support
-- Added validation for invalid filter values
-- Verified filters against MySQL
+### Swagger UI
 
-### Day 6: Validation & Error Handling
+<img src="assets/swagger-ui.png" alt="Swagger UI" width="1000">
 
-- Added custom exception classes
-- Added global exception handlers
-- Moved business validation into the service layer
-- Added duplicate interview scheduling validation
-- Added application date-range validation
-- Added interview date-range validation
-- Verified all validation paths
-- Completed end-to-end regression testing
+### Test Coverage Report
 
-### Day 7: Automated Testing & Quality Assurance
+<img src="assets/coverage-report.png" alt="Test Coverage Report" width="1000">
 
-- Implemented a dedicated MySQL test database
-- Configured Pytest with reusable fixtures
-- Added automated CRUD tests for Companies
-- Added automated CRUD tests for Job Applications
-- Added automated CRUD tests for Interviews
-- Created end-to-end workflow tests covering complete job search scenarios
-- Tested validation rules, custom exceptions, and business logic
-- Verified filtering, searching, sorting, and pagination
-- Generated code coverage reports using pytest-cov
-- Achieved 55 automated tests with approximately 97% code coverage
-- Verified application stability through a full regression test suite
+### Railway Deployment
 
-### Day 8: Authentication
+<img src="assets/railway-dashboard.png" alt="Railway Deployment" width="1000">
 
-- Added User ORM model
-- Added JWT authentication
-- Added Argon2 password hashing
-- Added authentication service layer
-- Added authentication router
-- Added user registration endpoint
-- Added user login endpoint
-- Added protected `/auth/me` endpoint
-- Added authentication middleware using HTTP Bearer tokens
-- Added automated authentication tests
-- Increased automated test suite to 76 tests
-- Increased code coverage to 98%
-
-## Current Endpoints
+## API Endpoints
 
 ### Health
 
-| Method | Endpoint  | Description               |
-| ------ | --------- | ------------------------- |
-| GET    | `/health` | Verify the API is running |
+| Method | Endpoint  |
+| ------ | --------- |
+| GET    | `/health` |
+
+### Authentication
+
+| Method | Endpoint         |
+| ------ | ---------------- |
+| POST   | `/auth/register` |
+| POST   | `/auth/login`    |
+| GET    | `/auth/me`       |
 
 ### Companies
 
-| Method | Endpoint                  | Description                |
-| ------ | ------------------------- | -------------------------- |
-| POST   | `/companies`              | Create a new company       |
-| GET    | `/companies`              | Retrieve all companies     |
-| GET    | `/companies/{company_id}` | Retrieve a company by ID   |
-| PUT    | `/companies/{company_id}` | Update an existing company |
-| DELETE | `/companies/{company_id}` | Delete a company           |
+| Method | Endpoint          |
+| ------ | ----------------- |
+| POST   | `/companies`      |
+| GET    | `/companies`      |
+| GET    | `/companies/{id}` |
+| PUT    | `/companies/{id}` |
+| DELETE | `/companies/{id}` |
 
 ### Job Applications
 
-| Method | Endpoint                         | Description                        |
-| ------ | -------------------------------- | ---------------------------------- |
-| POST   | `/applications`                  | Create a new job application       |
-| GET    | `/applications`                  | Retrieve all job applications      |
-| GET    | `/applications/{application_id}` | Retrieve a job application by ID   |
-| PUT    | `/applications/{application_id}` | Update an existing job application |
-| DELETE | `/applications/{application_id}` | Delete a job application           |
-
-#### Query Parameters (GET /applications)
-
-- status_filter
-- company_id
-- company
-- location
-- work_arrangement
-- search
-- date_applied_from
-- date_applied_to
-- sort_by
-- sort_order
-- limit
-- offset
+| Method | Endpoint             |
+| ------ | -------------------- |
+| POST   | `/applications`      |
+| GET    | `/applications`      |
+| GET    | `/applications/{id}` |
+| PUT    | `/applications/{id}` |
+| DELETE | `/applications/{id}` |
 
 ### Interviews
 
-| Method | Endpoint                     | Description                  |
-| ------ | ---------------------------- | ---------------------------- |
-| POST   | `/interviews`                | Create a new interview       |
-| GET    | `/interviews`                | Retrieve all interviews      |
-| GET    | `/interviews/{interview_id}` | Retrieve an interview by ID  |
-| PUT    | `/interviews/{interview_id}` | Update an existing interview |
-| DELETE | `/interviews/{interview_id}` | Delete an interview          |
+| Method | Endpoint           |
+| ------ | ------------------ |
+| POST   | `/interviews`      |
+| GET    | `/interviews`      |
+| GET    | `/interviews/{id}` |
+| PUT    | `/interviews/{id}` |
+| DELETE | `/interviews/{id}` |
 
-#### Query Parameters (GET /interviews)
+---
 
-- application_id
-- interview_type
-- status_filter
-- outcome
-- scheduled_from
-- scheduled_to
-- sort_order
-- limit
-- offset
+## Example Requests
 
-#### Authentication
-
-| Method | Endpoint         | Description                     |
-| ------ | ---------------- | ------------------------------- |
-| POST   | `/auth/register` | Register a new user             |
-| POST   | `/auth/login`    | Authenticate a user             |
-| GET    | `/auth/me`       | Retrieve the authenticated user |
-
-### Example Requests
-
-### Applications
-
-```http
-GET /applications?status_filter=saved
-```
-
-```http
-GET /applications?company=Stripe
-```
-
-```http
-GET /applications?search=Python
-```
-
-```http
-GET /applications?work_arrangement=hybrid
-```
-
-```http
-GET /applications?limit=10&offset=0
-```
-
-### Interviews
-
-```http
-GET /interviews?status_filter=scheduled
-```
-
-```http
-GET /interviews?application_id=2
-```
-
-```http
-GET /interviews?interview_type=behavioral
-```
-
-```http
-GET /interviews?scheduled_from=2026-08-01T00:00:00
-```
-
-### Authentication
+### Register
 
 ```http
 POST /auth/register
@@ -261,6 +259,8 @@ POST /auth/register
 }
 ```
 
+### Login
+
 ```http
 POST /auth/login
 ```
@@ -272,67 +272,93 @@ POST /auth/login
 }
 ```
 
-Response
-
-```json
-{
-  "access_token": "...",
-  "token_type": "bearer"
-}
-```
+### Authenticated Request
 
 ```http
 GET /auth/me
 Authorization: Bearer <JWT>
 ```
 
-## Requirements
-
-- Python 3.12+
-- MySQL 9.x LTS
+---
 
 ## Local Development
 
-Create and activate a virtual environment:
+### Clone
+
+```bash
+git clone <repository-url>
+```
+
+### Create a virtual environment
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
-Install dependencies:
+### Install dependencies
 
 ```bash
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-Run the API:
+### Run the application
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Swagger UI:
+Swagger:
 
 ```
 http://127.0.0.1:8000/docs
 ```
 
-Run all tests
+---
 
-```
+## Testing
+
+The project includes automated tests covering:
+
+- Authentication
+- Companies
+- Job Applications
+- Interviews
+- Validation and exception handling
+- End-to-end API workflows
+
+Run all tests:
+
+```bash
 python -m pytest
 ```
 
-## Roadmap
+Generate a coverage report:
 
-- Day 1 — Project setup
-- Day 2 — Company Management API
-- Day 3 — Job Applications
-- Day 4 — Interviews
-- Day 5 — Search, filtering, and pagination
-- Day 6 — Validation and exception handling
-- Day 7 — Automated testing
-- Day 8 — Authentication
-- Day 9 — Deployment
-- Day 10 — Documentation and polish
+```bash
+python -m pytest --cov=app --cov-report=term-missing --cov-report=html
+```
+
+Current test suite:
+
+- **70 automated tests**
+- **98% code coverage**
+
+---
+
+## Future Enhancements
+
+- Refresh tokens
+- Role-based authorization
+- Docker support
+- Alembic database migrations
+- Email notifications
+- Saved searches
+- Application reminders
+- CI/CD pipeline with GitHub Actions
+
+---
+
+## License
+
+MIT
