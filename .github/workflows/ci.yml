@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    # Dependabot branches are tested through their pull requests instead.
+    branches-ignore: ["dependabot/**"]
+  pull_request:
+    branches: ["main", "develop"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: pip install ruff==0.17.1
+
+      - name: Run Ruff
+        run: ruff check --output-format=github .
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+
+    # WHY:
+    # Every database setting points at the disposable MySQL service below.
+    # app/main.py runs create_all() against DB_* at import time, and
+    # tests/conftest.py runs drop_all() against TEST_DATABASE_URL, so both
+    # must target throwaway databases that only exist for this job.
+    env:
+      APP_ENV: ci
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_NAME: job_search_ci_app
+      DB_USER: root
+      DB_PASSWORD: ci-root-password
+      TEST_DATABASE_URL: mysql+pymysql://root:ci-root-password@127.0.0.1:3306/job_search_ci_test
+      JWT_SECRET_KEY: ci-only-jwt-secret-not-used-outside-github-actions
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: job_search_ci_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create application database
+        run: >-
+          mysql -h 127.0.0.1 -P 3306 -uroot -p"$DB_PASSWORD"
+          -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+
+      - name: Run tests with coverage
+        run: >-
+          python -m pytest
+          --cov=app
+          --cov-report=term-missing
+          --cov-report=xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
