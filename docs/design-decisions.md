@@ -91,3 +91,27 @@ feature/* ──PR──▶ develop ──PR──▶ main ──▶ Railway dep
 - After a `hotfix/*` or Dependabot merge into `main`, `main` must be merged back into `develop` to keep the branches in sync.
 - Pull requests from `develop` into `main` should use a merge commit, not squash. Squashing rewrites `develop`'s commits on `main`, so the two branches would diverge and every later release pull request would show old changes again.
 - With no bypass, a broken required check blocks all merges until the workflow is fixed through a pull request.
+
+---
+
+## How are dependency vulnerabilities and code scanning alerts handled?
+
+**Decision**
+
+- Dependencies were upgraded in one pull request into `develop`: FastAPI 0.128.8 → 0.143.3 and Starlette 0.49.3 → 1.8.0 together (FastAPI 0.128.x requires `starlette<1.0.0`), PyJWT 2.13.0 → 2.15.1, plus FastAPI's new dependency `opentelemetry-api`. After the upgrade, an OSV check of every pinned package reports no known advisories.
+- Dependabot pull requests #7 (PyJWT) and #8 (Starlette alone) were closed as superseded instead of merged.
+- Bandit excludes `tests/`. The one remaining Bandit finding in `app/` (B106 on `token_type="bearer"`) is suppressed in code with `# nosec B106` and a comment explaining why.
+
+**Why**
+
+- **Upgrade together:** bumping Starlette to 1.x on its own breaks installation against FastAPI 0.128.x. This already happened once and was rolled back with a pin, so the two must move as a pair.
+- **Supersede the Dependabot PRs:** both were opened against the old `main`, which has none of the required CI workflows, so they could never satisfy the `main` ruleset. Merging them straight into `main` would also have put `main` ahead of `develop`.
+- **Exclude tests from Bandit:** all 252 open code scanning alerts were Bandit findings. 243 were B101 (`assert` used), which is how pytest works, and 8 were B105 (fake passwords in test fixtures). Neither is a risk in test code. CodeQL still analyzes the whole repository.
+- **Suppress in code, not only in the UI:** a `# nosec` comment keeps the reason next to the code and survives re-scans; a dismissal in the Security tab is invisible to anyone reading the source.
+
+**Trade-off**
+
+- Excluding `tests/` means Bandit would not catch a genuinely unsafe pattern added to test code.
+- The exclusion must be written `./tests`: Bandit matches exclusions against paths like `./tests/test_auth.py`, so a bare `tests` silently excludes nothing.
+- Starlette 1.8 deprecates using `httpx` with its test client in favor of `httpx2`. Tests still pass with a deprecation warning; switching is a separate follow-up.
+- Dependabot and code scanning alerts are evaluated on the default branch, so they only close after this change reaches `main`.
