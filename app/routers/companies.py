@@ -3,11 +3,16 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas import CompanyCreate, CompanyResponse, CompanyUpdate
+from app.routers.auth import get_current_user
 from app.services import company_service
 
 router = APIRouter(
     prefix="/companies",
     tags=["Companies"],
+    # WHY:
+    # Every endpoint in this router requires a valid bearer token.
+    # Records are not yet scoped to the logged-in user (planned for v0.2.0).
+    dependencies=[Depends(get_current_user)],
 )
 
 DatabaseSession = Annotated[Session, Depends(get_db)]

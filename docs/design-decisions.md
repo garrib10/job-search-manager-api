@@ -115,3 +115,33 @@ feature/* ──PR──▶ develop ──PR──▶ main ──▶ Railway dep
 - The exclusion must be written `./tests`: Bandit matches exclusions against paths like `./tests/test_auth.py`, so a bare `tests` silently excludes nothing.
 - Starlette 1.8 deprecates using `httpx` with its test client in favor of `httpx2`. Tests still pass with a deprecation warning; switching is a separate follow-up.
 - Dependabot and code scanning alerts are evaluated on the default branch, so they only close after this change reaches `main`.
+
+---
+
+## How are the company, application, and interview endpoints protected?
+
+**Decision**
+
+The companies, applications, and interviews routers each declare the existing authentication dependency once, at router level:
+
+```python
+router = APIRouter(
+    prefix="/companies",
+    tags=["Companies"],
+    dependencies=[Depends(get_current_user)],
+)
+```
+
+Every endpoint on those routers now requires a valid bearer token. Requests with no token, an invalid token, or an expired token get `401`. Registration, login, `/health`, and the API docs stay public.
+
+**Why**
+
+- **One declaration per router:** adding the dependency to each endpoint individually would make it easy for a future endpoint to be added without protection. At router level, new endpoints are protected by default.
+- **Reuse the existing dependency:** `get_current_user` (the dependency behind `CurrentUser`) already validates the token and checks the user exists and is active. No second implementation was added.
+- **Regression tests guard it:** `tests/test_resource_auth.py` checks every resource endpoint without a token, with an invalid token, and with an expired token; confirms rejected writes don't change data; and fails if a resource endpoint exists that the tests don't list.
+- **Swagger shows it:** FastAPI marks each protected operation with the `HTTPBearer` security scheme, so Swagger shows a lock icon and sends the token entered in **Authorize**.
+
+**Trade-off**
+
+- **Data is still shared.** This change only requires a logged-in user. Records have no owner yet, so every authenticated user can read and change every record. Ownership and per-user isolation are planned for v0.2.0.
+- Router-level dependencies return no value to the endpoint. When endpoints need the current user (for ownership in v0.2.0), they will take `CurrentUser` as a parameter as well.

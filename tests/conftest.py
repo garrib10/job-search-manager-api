@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.database import Base, get_db
 from app.main import app
 from app.models import Company, Interview, JobApplication, User
+from app.schemas import UserCreate
+from app.security import create_access_token
+from app.services import auth_service
 
 load_dotenv()
 
@@ -109,3 +112,50 @@ def client(
         yield test_client
 
     app.dependency_overrides.clear()
+
+
+TEST_USER_EMAIL = "resource-user@example.com"
+TEST_USER_PASSWORD = "TestPassword123!"
+
+
+@pytest.fixture
+def auth_headers(
+    db_session: Session,
+) -> dict[str, str]:
+    """
+    Create a test user and return a valid bearer token header for it.
+
+    WHY:
+    Company, application, and interview endpoints require login. The user
+    is created through the same service and token function the API uses,
+    so tests exercise the real authentication path.
+    """
+    auth_service.register_user(
+        db_session,
+        UserCreate(
+            email=TEST_USER_EMAIL,
+            password=TEST_USER_PASSWORD,
+        ),
+    )
+
+    token = create_access_token(TEST_USER_EMAIL)
+
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def authenticated_client(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> TestClient:
+    """
+    Send the test user's bearer token with every request made by `client`.
+
+    WHY:
+    Resource test modules opt in with
+    `pytestmark = pytest.mark.usefixtures("authenticated_client")`, so their
+    existing tests keep using `client` while authenticated.
+    """
+    client.headers.update(auth_headers)
+
+    return client

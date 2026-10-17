@@ -1,3 +1,9 @@
+import pytest
+
+# Resource endpoints require login; every test here uses an authenticated client.
+pytestmark = pytest.mark.usefixtures("authenticated_client")
+
+
 def test_create_company(client):
     response = client.post(
         "/companies",
