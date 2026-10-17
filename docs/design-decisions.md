@@ -45,11 +45,11 @@ Dependabot (`.github/dependabot.yml`) opens weekly grouped update pull requests 
 
 - Labels make the pull request list easy to scan and connect pull requests to the same labels used on issues.
 - Adding labels requires a token with `pull-requests: write`. The `pull_request` event only gets a read-only token for Dependabot pull requests, so the labeler uses `pull_request_target`.
-- `pull_request_target` runs with write permissions, which is dangerous if the workflow runs code from the pull request. This workflow has no `run:` steps and no checkout; the labeler only reads the list of changed file paths through the GitHub API, and the workflow and label rules always come from the base branch.
+- `pull_request_target` runs with write permissions, which is dangerous if the workflow runs code from the pull request. This workflow has no `run:` steps and no checkout; the labeler only reads the list of changed file paths through the GitHub API, and the workflow and label rules always come from the default branch (`main`), never from the pull request.
 
 **Trade-off**
 
-- Because the workflow and rules are read from the base branch, changes to `.github/labeler.yml` only take effect after they are merged, and the pull request that adds the labeler is not labeled by it.
+- Because GitHub reads the workflow and rules from the default branch, the labeler does nothing until it reaches `main`, and changes to `.github/labeler.yml` only take effect after a release. Merging it into `develop` alone is not enough.
 - `sync-labels` is left off, so labels are only added, never removed automatically, and labels added by hand are preserved.
 
 ---
