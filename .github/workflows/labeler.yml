@@ -2,8 +2,9 @@ name: Labeler
 
 # WHY:
 # pull_request_target is needed so the token can add labels to pull requests,
-# including Dependabot's. It runs the workflow and .github/labeler.yml from the
-# base branch, and this job never checks out or runs pull request code.
+# including Dependabot's. GitHub runs the workflow and .github/labeler.yml from
+# the default branch (main), and this job never checks out or runs pull request
+# code.
 
 on:
   pull_request_target:
