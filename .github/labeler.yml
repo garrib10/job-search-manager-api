@@ -1,0 +1,62 @@
+# Labels applied to pull requests by .github/workflows/labeler.yml,
+# based on which files the pull request changes.
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "ruff.toml"
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "SECURITY.md"
+          - "app/security.py"
+          - ".github/workflows/codeql.yml"
+          - ".github/workflows/bandit.yml"
+          - ".github/workflows/dependency-review.yml"
+
+auth:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/security.py"
+          - "app/routers/auth.py"
+          - "app/services/auth_service.py"
+          - "app/schemas/user.py"
+          - "app/models/user.py"
+
+database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/database.py"
+          - "app/models/**"
+          - "alembic/**"
+          - "alembic.ini"
+
+validation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "app/schemas/**"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "requirements*.txt"
+
+deployment:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "railway.json"
+          - "railway.toml"
+          - "Procfile"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**/*.md"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
