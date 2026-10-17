@@ -19,12 +19,17 @@ from app.schemas import (
     InterviewResponse,
     InterviewUpdate,
 )
+from app.routers.auth import get_current_user
 from app.services import interview_service
 
 
 router = APIRouter(
     prefix="/interviews",
     tags=["Interviews"],
+    # WHY:
+    # Every endpoint in this router requires a valid bearer token.
+    # Records are not yet scoped to the logged-in user (planned for v0.2.0).
+    dependencies=[Depends(get_current_user)],
 )
 
 DatabaseSession = Annotated[Session, Depends(get_db)]

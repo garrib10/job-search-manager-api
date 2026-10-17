@@ -2,6 +2,15 @@
 
 Each entry records a question about how the project works, the decision made, why, and the trade-off accepted.
 
+## Contents
+
+1. [How is the API verified before code reaches `main`?](#how-is-the-api-verified-before-code-reaches-main)
+2. [How are pull requests labeled, and why is `pull_request_target` safe here?](#how-are-pull-requests-labeled-and-why-is-pull_request_target-safe-here)
+3. [How does code get from a feature branch to production?](#how-does-code-get-from-a-feature-branch-to-production)
+4. [How are dependency vulnerabilities and code scanning alerts handled?](#how-are-dependency-vulnerabilities-and-code-scanning-alerts-handled)
+5. [How are the company, application, and interview endpoints protected?](#how-are-the-company-application-and-interview-endpoints-protected)
+6. [How should security vulnerabilities be reported?](#how-should-security-vulnerabilities-be-reported)
+
 ---
 
 ## How is the API verified before code reaches `main`?
@@ -115,3 +124,55 @@ feature/* ──PR──▶ develop ──PR──▶ main ──▶ Railway dep
 - The exclusion must be written `./tests`: Bandit matches exclusions against paths like `./tests/test_auth.py`, so a bare `tests` silently excludes nothing.
 - Starlette 1.8 deprecates using `httpx` with its test client in favor of `httpx2`. Tests still pass with a deprecation warning; switching is a separate follow-up.
 - Dependabot and code scanning alerts are evaluated on the default branch, so they only close after this change reaches `main`.
+
+---
+
+## How are the company, application, and interview endpoints protected?
+
+**Decision**
+
+The companies, applications, and interviews routers each declare the existing authentication dependency once, at router level:
+
+```python
+router = APIRouter(
+    prefix="/companies",
+    tags=["Companies"],
+    dependencies=[Depends(get_current_user)],
+)
+```
+
+Every endpoint on those routers now requires a valid bearer token. Requests with no token, an invalid token, or an expired token get `401`. Registration, login, `/health`, and the API docs stay public.
+
+**Why**
+
+- **One declaration per router:** adding the dependency to each endpoint individually would make it easy for a future endpoint to be added without protection. At router level, new endpoints are protected by default.
+- **Reuse the existing dependency:** `get_current_user` (the dependency behind `CurrentUser`) already validates the token and checks the user exists and is active. No second implementation was added.
+- **Regression tests guard it:** `tests/test_resource_auth.py` checks every resource endpoint without a token, with an invalid token, and with an expired token; confirms rejected writes don't change data; and fails if a resource endpoint exists that the tests don't list.
+- **Swagger shows it:** FastAPI marks each protected operation with the `HTTPBearer` security scheme, so Swagger shows a lock icon and sends the token entered in **Authorize**.
+
+**Trade-off**
+
+- **Data is still shared.** This change only requires a logged-in user. Records have no owner yet, so every authenticated user can read and change every record. Ownership and per-user isolation are planned for v0.2.0.
+- Router-level dependencies return no value to the endpoint. When endpoints need the current user (for ownership in v0.2.0), they will take `CurrentUser` as a parameter as well.
+
+---
+
+## How should security vulnerabilities be reported?
+
+**Decision**
+
+`SECURITY.md` at the repository root sends reporters to GitHub's private vulnerability reporting, which is enabled on the repository. It defines the supported version (the latest release on `main`), best-effort response times (acknowledgement within 7 days, assessment within 14), what is in and out of scope, and testing guidelines.
+
+**Why**
+
+- **Private by default:** a public issue would disclose a vulnerability before it can be fixed. GitHub's private reporting creates a draft security advisory that only the maintainer and the reporter can see, and it can be published with credit once a fix is released.
+- **GitHub links to it:** a root-level `SECURITY.md` appears in the repository's **Security** tab as the security policy and is shown to anyone opening a new issue.
+- **Honest response times:** this is a solo-maintained project, so the policy promises what one person can deliver rather than an enterprise SLA.
+- **Known limitations listed up front:** the shared-data limitation (no per-user ownership until v0.2.0) is documented so it isn't reported repeatedly as a new finding.
+- **Testing guidelines protect the live demo:** the deployed API is public, so the policy asks testers to use only their own accounts and not to run scanners or load tests against it.
+
+**Trade-off**
+
+- Only the latest release is supported; anyone running an older version must upgrade to get fixes.
+- Response times are best effort, not guaranteed.
+- The known-limitation section must be updated when v0.2.0 adds ownership, or it will become inaccurate.
