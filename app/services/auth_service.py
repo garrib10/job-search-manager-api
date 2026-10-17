@@ -110,7 +110,8 @@ def create_token_for_user(
 
     return Token(
         access_token=access_token,
-        token_type="bearer",
+        # "bearer" is the OAuth 2.0 token type, not a secret.
+        token_type="bearer",  # nosec B106
     )
 
 def require_user_by_email(

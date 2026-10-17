@@ -1,0 +1,46 @@
+name: Source Branch
+
+# WHY:
+# Rulesets cannot restrict which branch a pull request comes from, so this
+# check enforces feature/* -> develop -> main. Only develop, hotfix/*, and
+# dependabot/* branches from this repository may open pull requests into main.
+#
+# "edited" re-runs the check when a pull request's base branch is changed.
+# No checkout happens and the token has no permissions; branch names are
+# passed through environment variables, never interpolated into the script.
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+jobs:
+  source-branch:
+    name: source-branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check pull request source branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          echo "Source branch: $HEAD_REF"
+          echo "Source repository: $HEAD_REPO"
+
+          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            echo "::error::Pull requests into main must come from a branch in this repository, not a fork."
+            exit 1
+          fi
+
+          case "$HEAD_REF" in
+            develop | hotfix/* | dependabot/*)
+              echo "Allowed: this branch may open pull requests into main."
+              ;;
+            *)
+              echo "::error::Pull requests into main must come from develop, hotfix/*, or dependabot/*. Open this pull request into develop instead."
+              exit 1
+              ;;
+          esac
