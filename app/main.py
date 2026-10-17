@@ -11,7 +11,7 @@ from app.handlers import (
     not_found_exception_handler,
     validation_exception_handler,
 )
-from app.models import Company, Interview, JobApplication, User
+from app.models import Company, Interview, JobApplication, User  # noqa: F401
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.companies import router as companies_router
