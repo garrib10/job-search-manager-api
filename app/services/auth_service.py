@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.database import commit_or_rollback
 from app.exceptions import ConflictException, NotFoundException
 from app.models import User
 from app.schemas import Token, UserCreate
@@ -57,7 +58,7 @@ def register_user(
     )
 
     db.add(user)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(user)
 
     return user

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.database import commit_or_rollback
 from app.enums import (
     InterviewOutcome,
     InterviewStatus,
@@ -120,7 +121,7 @@ def create_interview(
     )
 
     db.add(interview)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(interview)
 
     return interview
@@ -247,7 +248,7 @@ def update_interview(
     interview.location = interview_data.location
     interview.notes = interview_data.notes
 
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(interview)
 
     return interview
@@ -259,4 +260,4 @@ def delete_interview(
     """Delete an existing interview."""
 
     db.delete(interview)
-    db.commit()
+    commit_or_rollback(db)

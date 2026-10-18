@@ -14,6 +14,7 @@ from app.security import create_access_token
 from app.services import auth_service
 from tests.db_safety import (
     assert_safe_test_database,
+    drop_all_tables,
     drop_test_schema,
     parse_test_database_url,
     reset_test_schema,
@@ -185,3 +186,22 @@ def authenticated_client(
     client.headers.update(auth_headers)
 
     return client
+
+
+@pytest.fixture
+def empty_database() -> Generator[None, None, None]:
+    """
+    Start a migration test with a completely empty test database.
+
+    WHY:
+    Migration tests run Alembic from scratch. Afterwards the tables the
+    rest of the suite expects are recreated. Both steps go through the
+    guarded helpers in tests/db_safety.py.
+    """
+    drop_all_tables(test_engine, APP_DATABASE_NAME)
+
+    yield
+
+    drop_all_tables(test_engine, APP_DATABASE_NAME)
+    reset_test_schema(test_engine, Base.metadata, APP_DATABASE_NAME)
+

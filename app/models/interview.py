@@ -99,8 +99,16 @@ class Interview(Base):
         onupdate=func.now(),
     )
 
+    # WHY:
+    # Interviews can't exist without their application, so the database
+    # deletes them when the application is deleted. The constraint is named
+    # so migrations can manage it reliably.
     application_id: Mapped[int] = mapped_column(
-        ForeignKey("job_applications.id"),
+        ForeignKey(
+            "job_applications.id",
+            name="fk_interviews_application_id_job_applications",
+            ondelete="CASCADE",
+        ),
         nullable=False,
         index=True,
     )

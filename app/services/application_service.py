@@ -2,6 +2,7 @@ from datetime import date
 from typing import Literal
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
+from app.database import commit_or_rollback
 from app.enums import ApplicationStatus, WorkArrangement
 from app.exceptions import (
     ConflictException,
@@ -16,16 +17,21 @@ from app.services.company_service import require_company_by_id
 def get_application_by_job_url(
     db: Session,
     job_url: str,
+    *,
+    user_id: int,
 ) -> JobApplication | None:
     """
-    Return a job application matching an exact job URL.
+    Return one of the user's job applications matching an exact job URL.
 
     WHY:
-    The project treats a job URL as unique so the same posting is not
-    accidentally tracked more than once.
+    A job URL is unique per user (uq_job_applications_user_id_job_url) so
+    the same posting is not tracked twice by one person, while different
+    users can each track the same posting. Checking only the user's own
+    applications also avoids revealing what other users track.
     """
     statement = select(JobApplication).where(
-        JobApplication.job_url == job_url
+        JobApplication.job_url == job_url,
+        JobApplication.user_id == user_id,
     )
 
     return db.scalar(statement)
@@ -84,6 +90,7 @@ def create_application(
     existing_application = get_application_by_job_url(
         db,
         job_url,
+        user_id=user_id,
     )
 
     if existing_application is not None:
@@ -106,7 +113,7 @@ def create_application(
     )
 
     db.add(application)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(application)
 
     return application
@@ -258,6 +265,7 @@ def update_application(
     existing_application = get_application_by_job_url(
         db,
         job_url,
+        user_id=user_id,
     )
 
     if (
@@ -279,7 +287,7 @@ def update_application(
     application.notes = application_data.notes
     application.date_applied = application_data.date_applied
 
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(application)
 
     return application
@@ -292,4 +300,4 @@ def delete_application(
     """Delete an existing job application."""
 
     db.delete(application)
-    db.commit()
+    commit_or_rollback(db)
