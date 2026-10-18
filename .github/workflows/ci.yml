@@ -37,9 +37,9 @@ jobs:
 
     # WHY:
     # Every database setting points at the disposable MySQL service below.
-    # app/main.py runs create_all() against DB_* at import time, and
-    # tests/conftest.py runs drop_all() against TEST_DATABASE_URL, so both
-    # must target throwaway databases that only exist for this job.
+    # Alembic migrates DB_NAME (job_search_ci_app), and tests/conftest.py drops
+    # and recreates tables in TEST_DATABASE_URL (job_search_ci_test). Both are
+    # throwaway databases that only exist for this job.
     env:
       APP_ENV: ci
       DB_HOST: 127.0.0.1
@@ -77,10 +77,34 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Create application database
+      - name: Create empty application database
         run: >-
           mysql -h 127.0.0.1 -P 3306 -uroot -p"$DB_PASSWORD"
-          -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+          -e "CREATE DATABASE $DB_NAME;"
+
+      # WHY:
+      # The test suite builds its own tables from the models, so passing tests
+      # alone cannot prove the migrations are complete. These steps run the
+      # migrations on the empty application database and compare the result
+      # with the models.
+      - name: "Migrations: upgrade empty database to head"
+        run: alembic upgrade head
+
+      - name: "Migrations: re-running upgrade is a no-op"
+        run: |
+          alembic upgrade head
+          test "$(alembic current | awk '{print $1}')" = "$(alembic heads | awk '{print $1}')"
+
+      - name: "Migrations: schema matches models"
+        run: |
+          alembic check
+          python -m scripts.compare_schema
+
+      - name: "Migrations: downgrade to base and upgrade again"
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
 
       - name: Run tests with coverage
         run: >-

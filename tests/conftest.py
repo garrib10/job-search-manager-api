@@ -5,26 +5,36 @@ from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
 from app.models import Company, Interview, JobApplication, User
 from app.schemas import UserCreate
 from app.security import create_access_token
 from app.services import auth_service
+from tests.db_safety import (
+    assert_safe_test_database,
+    drop_test_schema,
+    parse_test_database_url,
+    reset_test_schema,
+)
 
 load_dotenv()
 
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+TEST_DATABASE_URL = parse_test_database_url(
+    os.getenv("TEST_DATABASE_URL")
+)
 
-if not TEST_DATABASE_URL:
-    raise RuntimeError(
-        "TEST_DATABASE_URL is not configured"
-    )
+APP_DATABASE_NAME = get_settings().db_name
 
-
+# WHY:
+# Fail before any fixture runs if the test database is not clearly disposable.
+# The check uses the URL of the engine the fixtures actually use.
 test_engine = create_engine(
     TEST_DATABASE_URL,
 )
+
+assert_safe_test_database(test_engine.url, APP_DATABASE_NAME)
 
 TestingSessionLocal = sessionmaker(
     autocommit=False,
@@ -41,14 +51,14 @@ def setup_test_database() -> Generator[None, None, None]:
 
     WHY:
     Tests should run against an isolated database schema rather than
-    using the development database.
+    using the development database. Tables are created from the models
+    here; migrations are verified separately (see the CI workflow).
     """
-    Base.metadata.drop_all(bind=test_engine)
-    Base.metadata.create_all(bind=test_engine)
+    reset_test_schema(test_engine, Base.metadata, APP_DATABASE_NAME)
 
     yield
 
-    Base.metadata.drop_all(bind=test_engine)
+    drop_test_schema(test_engine, Base.metadata, APP_DATABASE_NAME)
 
 
 @pytest.fixture(autouse=True)
