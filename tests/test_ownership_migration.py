@@ -12,69 +12,28 @@ Each test starts from an empty database and, afterwards, restores the tables
 the rest of the suite expects.
 """
 
-from pathlib import Path
-
 import pytest
-from alembic import command
 from alembic.autogenerate import compare_metadata
-from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
 from app.database import Base
-from tests.conftest import APP_DATABASE_NAME, test_engine
-from tests.db_safety import drop_all_tables, reset_test_schema
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from tests.conftest import test_engine
+from tests.migration_utils import (
+    HEAD,
+    alembic,
+    current_revision,
+    execute,
+    query,
+    scalar,
+)
 
 BASELINE = "2bf55ef584f4"
 STAGE_1 = "865d60d22f27"
-HEAD = "add88b8a484a"
 
 OWNER_EMAIL = "owner@example.com"
 OTHER_EMAIL = "other@example.com"
-
-
-@pytest.fixture
-def empty_database():
-    drop_all_tables(test_engine, APP_DATABASE_NAME)
-
-    yield
-
-    drop_all_tables(test_engine, APP_DATABASE_NAME)
-    reset_test_schema(test_engine, Base.metadata, APP_DATABASE_NAME)
-
-
-def alembic(action: str, revision: str, owner_email: str | None = None) -> None:
-    """Run an Alembic command against the test database, like the CLI would."""
-    config = Config()
-    config.set_main_option("script_location", str(REPO_ROOT / "alembic"))
-    config.cmd_opts = type("Options", (), {"x": [f"owner_email={owner_email}"] if owner_email else []})()
-
-    with test_engine.connect() as connection:
-        config.attributes["connection"] = connection
-        getattr(command, action)(config, revision)
-        connection.commit()
-
-
-def query(sql: str, **params):
-    with test_engine.connect() as connection:
-        return connection.execute(text(sql), params).all()
-
-
-def scalar(sql: str, **params):
-    return query(sql, **params)[0][0]
-
-
-def execute(sql: str, **params) -> None:
-    with test_engine.begin() as connection:
-        connection.execute(text(sql), params)
-
-
-def current_revision() -> str | None:
-    with test_engine.connect() as connection:
-        return MigrationContext.configure(connection).get_current_revision()
 
 
 def user_id_nullable(table: str) -> bool:

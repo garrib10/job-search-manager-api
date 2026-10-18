@@ -29,7 +29,6 @@ The project follows a layered architecture with separate routers, services, mode
 
 - Create, update, retrieve, and delete companies
 - Store company website, industry, location, and notes
-- Prevent duplicate company records
 
 ### Job Application Management
 

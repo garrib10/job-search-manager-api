@@ -208,6 +208,8 @@ Before you start:
 
    If it stops, nothing was changed. Read the message, fix the cause, and run it again.
 
+   `upgrade head` also applies every later migration, such as `9e9a352c0176` (job URLs unique per user, interviews deleted with their application). Until it runs, the deployed code's per-user duplicate check can disagree with the old global unique key; the API answers those rare cases with a generic `409`.
+
 8. **Verify:**
 
    ```bash

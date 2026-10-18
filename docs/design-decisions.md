@@ -13,6 +13,7 @@ Each entry records a question about how the project works, the decision made, wh
 7. [How is the database schema created and changed?](#how-is-the-database-schema-created-and-changed)
 8. [How are records owned, and how do existing records get an owner?](#how-are-records-owned-and-how-do-existing-records-get-an-owner)
 9. [How is each user's data kept separate?](#how-is-each-users-data-kept-separate)
+10. [What happens on delete, duplicates, and database conflicts?](#what-happens-on-delete-duplicates-and-database-conflicts)
 
 ---
 
@@ -275,4 +276,36 @@ Every endpoint on those routers now requires a valid bearer token. Requests with
 - The duplicate-`job_url` check is still global, because the database constraint is global; changing it to per-user is #21. Until then, a user who adds a URL another user already tracks gets a 409.
 - Every service call now needs a `user_id`. That's more parameters, but it keeps the scoping explicit and impossible to skip.
 - Interview queries add a join to `job_applications`; the join uses the existing indexed foreign key.
+
+---
+
+## What happens on delete, duplicates, and database conflicts?
+
+**Decision**
+
+- **Deleting a company that has applications returns `409 Conflict`** ("Company has job applications. Delete or move them first."). A company with no applications deletes normally. The existing foreign key from `job_applications` (no `ON DELETE` action, so MySQL restricts the delete) also blocks it at the database level.
+- **Deleting an application deletes its interviews.** The ORM relationship uses `cascade="all, delete-orphan"` with `passive_deletes=True`, and migration `9e9a352c0176` recreates the interview foreign key as `fk_interviews_application_id_job_applications` with `ON DELETE CASCADE`.
+- **Job URLs are unique per user:** `uq_job_applications_user_id_job_url` on `(user_id, job_url)` replaces the global unique key on `job_url`. The service's duplicate check only looks at the user's own applications.
+- **Company names have no uniqueness rule.** The README's "prevent duplicate company records" claim was removed instead. Nothing in the project had decided what makes two companies "the same" (for example, separate offices with the same name), so adding a constraint would have invented a rule.
+- **Database conflicts:**
+  - A global `IntegrityError` handler returns `409` with a generic message ("The request conflicts with existing data.") and logs the database error, method, and path server-side.
+  - Every service commit goes through `commit_or_rollback()`, which rolls the session back before re-raising.
+  - `get_db()` also rolls back on any exception.
+
+**Why**
+
+- **409 for companies instead of cascading:** deleting an employer shouldn't quietly erase the job history filed under it. An application, by contrast, owns its interviews, which mean nothing on their own, so cascading there is the expected behavior.
+- **Database rules back up the service checks.** The service checks give friendly messages, but two concurrent requests can both pass a check. The unique key, the restrictive foreign key, and the cascade foreign key keep the data correct either way.
+- **Per-user URLs:** with a global key, user B couldn't track a posting user A already tracked, and the 409 would reveal that someone did. Per user, each person's list is independent.
+- **Generic conflict messages:** raw MySQL errors include table, constraint, and column names and the submitted values (for example, `Duplicate entry '9-https://…' for key '…'`). Those go to the server log only.
+- **Explicit rollback:** a failed commit leaves the SQLAlchemy session unusable until it's rolled back. Rolling back at the point of failure guarantees nothing from the failed request is left pending, whatever happens afterwards. A test proves the next request on the same session still works.
+- **Migration safety:** the migration creates the new per-user key before dropping the global one, so URLs are never left unprotected. It also finds the old constraints by their columns, because the baseline let MySQL name them.
+
+**Trade-off**
+
+- To delete a company, a user must first delete or move its applications, which is an extra step.
+- The two delete paths behave differently: company deletes are refused while application deletes cascade. The API documentation and this entry explain the difference.
+- The generic 409 doesn't say which value conflicted; the friendlier messages come from the service checks, which cover normal use.
+- **Downgrading `9e9a352c0176`** restores the global URL key, and stops without changing anything if two users already share a URL.
+- Until `9e9a352c0176` runs in production, the deployed per-user check and the old global key can disagree. Those requests get the generic 409 (see `docs/database-migrations.md`).
 

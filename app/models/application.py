@@ -9,6 +9,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,6 +33,17 @@ class JobApplication(Base):
     """
 
     __tablename__ = "job_applications"
+
+    # WHY:
+    # A job URL identifies a posting, so the same user can't track it twice,
+    # but different users can each track the same posting.
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "job_url",
+            name="uq_job_applications_user_id_job_url",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
@@ -82,7 +94,6 @@ class JobApplication(Base):
     job_url: Mapped[str] = mapped_column(
         String(500),
         nullable=False,
-        unique=True,
     )
 
     notes: Mapped[str | None] = mapped_column(
@@ -138,6 +149,13 @@ class JobApplication(Base):
         back_populates="applications",
     )
 
+    # WHY:
+    # Deleting an application deletes its interviews. The ORM cascade
+    # handles interviews already loaded in the session; passive_deletes
+    # lets the database's ON DELETE CASCADE remove the rest without
+    # loading them first.
     interviews: Mapped[list["Interview"]] = relationship(
         back_populates="application",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     ) 

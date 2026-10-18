@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from sqlalchemy.exc import IntegrityError
 from app.config import get_settings
 from app.exceptions import (
     ConflictException,
@@ -7,6 +8,7 @@ from app.exceptions import (
 )
 from app.handlers import (
     conflict_exception_handler,
+    integrity_error_exception_handler,
     not_found_exception_handler,
     validation_exception_handler,
 )
@@ -53,6 +55,11 @@ app.add_exception_handler(
 app.add_exception_handler(
     ValidationException,
     validation_exception_handler,
+)
+
+app.add_exception_handler(
+    IntegrityError,
+    integrity_error_exception_handler,
 )
 
 

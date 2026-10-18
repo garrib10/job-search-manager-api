@@ -1,7 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.exceptions import NotFoundException
-from app.models import Company
+from app.database import commit_or_rollback
+from app.exceptions import ConflictException, NotFoundException
+from app.models import Company, JobApplication
 from app.schemas import CompanyCreate, CompanyUpdate
 
 def create_company(
@@ -27,7 +28,7 @@ def create_company(
     )
 
     db.add(company)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(company)
 
     return company
@@ -94,17 +95,42 @@ def update_company(
     company.location = company_data.location
     company.notes = company_data.notes
 
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(company)
 
     return company
+
+
+def company_has_applications(
+    db: Session,
+    company_id: int,
+) -> bool:
+    """Return True if any job application is filed under the company."""
+    return db.scalar(
+        select(JobApplication.id)
+        .where(JobApplication.company_id == company_id)
+        .limit(1)
+    ) is not None
 
 
 def delete_company(
     db: Session,
     company: Company,
 ) -> None:
-    """Delete an existing company."""
+    """
+    Delete a company that has no job applications.
+
+    WHY:
+    Deleting a company must not silently delete the applications filed
+    under it. The user has to delete or move those applications first. The
+    foreign key from job_applications also blocks the delete in the
+    database, so a concurrent request that adds an application still ends
+    in a 409 rather than orphaned data.
+    """
+    if company_has_applications(db, company.id):
+        raise ConflictException(
+            "Company has job applications. Delete or move them first."
+        )
 
     db.delete(company)
-    db.commit()
+    commit_or_rollback(db)
