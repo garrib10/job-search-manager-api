@@ -35,36 +35,41 @@ def create_company(
 
 def get_companies(
     db: Session,
+    *,
+    user_id: int,
 ) -> list[Company]:
-    """Return all companies ordered alphabetically by name."""
+    """Return the user's companies ordered alphabetically by name."""
 
-    statement = select(Company).order_by(Company.name)
+    statement = (
+        select(Company)
+        .where(Company.user_id == user_id)
+        .order_by(Company.name)
+    )
 
     return list(db.scalars(statement).all())
-
-
-def get_company_by_id(
-    db: Session,
-    company_id: int,
-) -> Company | None:
-    """Return one company, or None when the ID does not exist."""
-
-    return db.get(Company, company_id)
 
 
 def require_company_by_id(
     db: Session,
     company_id: int,
+    *,
+    user_id: int,
 ) -> Company:
     """
-    Return one company or raise an application-level not-found error.
+    Return one of the user's companies or raise a not-found error.
 
     WHY:
     Database-dependent existence checks belong in the service layer.
-    The global exception handler converts this exception into a
-    consistent 404 response.
+    Another user's company is reported exactly like a missing one, so
+    the API never reveals which IDs exist. The global exception handler
+    converts this exception into a consistent 404 response.
     """
-    company = db.get(Company, company_id)
+    company = db.scalar(
+        select(Company).where(
+            Company.id == company_id,
+            Company.user_id == user_id,
+        )
+    )
 
     if company is None:
         raise NotFoundException("Company not found")

@@ -6,8 +6,8 @@ Every resource endpoint requires a valid bearer token. These tests use the
 plain (unauthenticated) `client` fixture and only send a token when a test
 needs one, so a route that loses its protection fails here.
 
-Records are still shared by all authenticated users until ownership is added
-in v0.2.0; these tests only cover authentication, not data isolation.
+These tests only cover authentication. Isolation between authenticated users
+is covered in tests/test_isolation.py.
 """
 
 from datetime import timedelta

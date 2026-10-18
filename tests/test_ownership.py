@@ -3,9 +3,9 @@ New companies and applications are owned by the authenticated user.
 
 WHY:
 user_id is NOT NULL, so create endpoints must fill it in. The owner always
-comes from the bearer token; a user_id in the request body is ignored. Reads,
-updates, and deletes are not yet scoped to the owner (planned for #20), so
-these tests only cover how ownership is assigned on create.
+comes from the bearer token; a user_id in the request body is ignored.
+Cross-user isolation of reads, updates, and deletes is covered in
+tests/test_isolation.py.
 """
 
 from sqlalchemy import select
