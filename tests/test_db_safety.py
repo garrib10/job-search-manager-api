@@ -16,6 +16,7 @@ from tests.conftest import APP_DATABASE_NAME, test_engine
 from tests.db_safety import (
     UnsafeTestDatabaseError,
     assert_safe_test_database,
+    drop_all_tables,
     drop_test_schema,
     parse_test_database_url,
     reset_test_schema,
@@ -100,3 +101,10 @@ def test_reset_runs_only_after_guard_passes():
 
     metadata.drop_all.assert_called_once_with(bind=engine)
     metadata.create_all.assert_called_once_with(bind=engine)
+
+
+def test_drop_all_tables_rejects_unsafe_target_before_connecting():
+    engine = create_engine(url("production"))
+
+    with pytest.raises(UnsafeTestDatabaseError):
+        drop_all_tables(engine, APP_DB)

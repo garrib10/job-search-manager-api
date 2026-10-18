@@ -41,19 +41,42 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def run_with_connection(connection) -> None:
+    # WHY:
+    # MySQL commits DDL immediately, so each revision runs in its own
+    # transaction and records its version as soon as it finishes. If a later
+    # revision stops (for example, the ownership migration's safety checks),
+    # the database is left at the last completed revision, matching its schema.
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+        transaction_per_migration=True,
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
 def run_migrations_online() -> None:
-    """Run migrations against the database configured by DB_* settings."""
+    """
+    Run migrations against the database configured by DB_* settings.
+
+    WHY:
+    Callers such as the migration tests can pass an existing connection in
+    `config.attributes["connection"]` so migrations run against the disposable
+    test database instead of DB_*.
+    """
+    connection = config.attributes.get("connection")
+
+    if connection is not None:
+        run_with_connection(connection)
+        return
+
     connectable = create_engine(database_url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
+        run_with_connection(connection)
 
 
 if context.is_offline_mode():

@@ -66,6 +66,8 @@ def require_application_by_id(
 def create_application(
     db: Session,
     application_data: JobApplicationCreate,
+    *,
+    user_id: int,
 ) -> JobApplication:
     """
     Create and persist a new job application.
@@ -105,6 +107,7 @@ def create_application(
         status=application_data.status,
         notes=application_data.notes,
         date_applied=application_data.date_applied,
+        user_id=user_id,
     )
 
     db.add(application)

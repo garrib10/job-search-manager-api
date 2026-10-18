@@ -15,7 +15,7 @@ from app.schemas import (
     JobApplicationResponse,
     JobApplicationUpdate,
 )
-from app.routers.auth import get_current_user
+from app.routers.auth import CurrentUser, get_current_user
 from app.services import application_service
 
 
@@ -40,17 +40,21 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 def create_application(
     application_data: JobApplicationCreate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> JobApplicationResponse:
     """
-    Create a new job application.
+    Create a new job application owned by the authenticated user.
 
     WHY:
     Database-dependent business rules, such as company existence
     and duplicate job URL checks, are handled by the service layer.
+    The owner always comes from the bearer token, never from the
+    request body.
     """
     return application_service.create_application(
         db,
         application_data,
+        user_id=current_user.id,
     )
 
 

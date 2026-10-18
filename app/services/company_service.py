@@ -7,6 +7,8 @@ from app.schemas import CompanyCreate, CompanyUpdate
 def create_company(
     db: Session,
     company_data: CompanyCreate,
+    *,
+    user_id: int,
 ) -> Company:
     """
     Create and persist a new company.
@@ -21,6 +23,7 @@ def create_company(
         industry=company_data.industry,
         location=company_data.location,
         notes=company_data.notes,
+        user_id=user_id,
     )
 
     db.add(company)

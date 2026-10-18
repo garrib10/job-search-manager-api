@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas import CompanyCreate, CompanyResponse, CompanyUpdate
-from app.routers.auth import get_current_user
+from app.routers.auth import CurrentUser, get_current_user
 from app.services import company_service
 
 router = APIRouter(
@@ -27,17 +27,20 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 def create_company(
     company_data: CompanyCreate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> CompanyResponse:
     """
-    Create a new company.
+    Create a new company owned by the authenticated user.
 
     WHY:
     The router handles HTTP concerns while the service layer handles
-    persistence and business logic.
+    persistence and business logic. The owner always comes from the
+    bearer token, never from the request body.
     """
     return company_service.create_company(
         db,
         company_data,
+        user_id=current_user.id,
     )
 
 

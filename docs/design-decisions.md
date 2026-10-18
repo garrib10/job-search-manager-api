@@ -11,6 +11,7 @@ Each entry records a question about how the project works, the decision made, wh
 5. [How are the company, application, and interview endpoints protected?](#how-are-the-company-application-and-interview-endpoints-protected)
 6. [How should security vulnerabilities be reported?](#how-should-security-vulnerabilities-be-reported)
 7. [How is the database schema created and changed?](#how-is-the-database-schema-created-and-changed)
+8. [How are records owned, and how do existing records get an owner?](#how-are-records-owned-and-how-do-existing-records-get-an-owner)
 
 ---
 
@@ -204,4 +205,45 @@ Every endpoint on those routers now requires a valid bearer token. Requests with
 - **Downgrading the baseline drops every table**, so it is only for disposable databases.
 - **Production is not stamped yet.** It is a manual step that must happen before the first migration after the baseline is deployed. Migrations also run manually until deploy-time migrations are added in v0.3.0.
 - **Tests still build their schema with `create_all()`** for speed and isolation; the CI migration steps cover the gap.
+
+---
+
+## How are records owned, and how do existing records get an owner?
+
+**Decision**
+
+- `companies` and `job_applications` each have a `user_id` column: NOT NULL, indexed, with a named foreign key to `users.id`. Interviews have no `user_id`; they belong to whoever owns their application.
+- Create endpoints take the owner from the bearer token (`CurrentUser`) and pass it to the service. A `user_id` in the request body is ignored, and responses don't expose it.
+- The schema change is split into two migrations so existing rows are never lost or guessed:
+  1. `865d60d22f27` adds the columns as nullable.
+  2. `add88b8a484a` assigns unowned rows to an owner named explicitly with `alembic -x owner_email=...`, then enforces NOT NULL.
+- Stage 2 checks everything before writing: an owner is required if unowned rows exist, the owner must exist and be active, and every application must end up with the same owner as its company. If a check fails, it changes nothing and leaves the database at stage 1.
+
+**Implemented vs. pending**
+
+| | Status |
+| --- | --- |
+| Ownership columns, foreign keys, indexes, model relationships | Implemented |
+| Owner set from the token on create | Implemented |
+| Staged migration with validation, tested against disposable MySQL | Implemented |
+| Production backup, stamp, and migration | **Pending:** manual steps in `docs/database-migrations.md` |
+| Which account owns existing production records | **Pending:** not chosen yet |
+| Reads, updates, deletes, and parent references scoped to the owner | **Pending:** #20 |
+
+**Why**
+
+- **Applications store `user_id` directly** rather than relying only on their company. Owner filtering then doesn't need a join, and #20 can scope every query the same way. The consistency check keeps the two from disagreeing on existing data. (Enforcing it for new records belongs to #20's parent-ownership checks.)
+- **Interviews don't get a column** because an interview can't exist without an application. A second owner field could only ever duplicate the application's, or contradict it.
+- **Two stages instead of one** because a NOT NULL column can't be added to a table with rows that have no value. Nullable first, assign, then enforce is the standard safe sequence. It also lets stage 1 run before the new code is deployed, while the old code keeps working.
+- **The owner is never guessed.** Assigning everything to "the first user", or deleting rows, would silently hand data to the wrong account or destroy it. Requiring an explicit `owner_email`, and refusing to continue otherwise, keeps that decision with a person.
+- **Checks run before writes, and each revision commits on its own** (`transaction_per_migration=True`). MySQL can't roll back schema changes, so a stopped stage 2 must leave the database consistent at stage 1, with the right revision recorded and nothing half-done.
+- **The owner comes from the token, not the request body,** so a client can't create records on another user's behalf.
+
+**Trade-off**
+
+- **Isolation is not complete yet.** Records now have owners, but every authenticated user can still read and change every record until #20 scopes the queries.
+- Until then, a user can also create an application under another user's company; the parent-ownership check belongs to #20.
+- `owner_email` assigns all unowned rows to one account. Splitting existing data between accounts requires manual SQL between the stages.
+- **Undoing stage 1 permanently discards owner assignments,** although it keeps the records themselves.
+- Production needs a manual, ordered procedure: back up, stamp, stage 1, deploy, stage 2, verify. It stays manual until deploy-time migrations arrive in v0.3.0.
 
