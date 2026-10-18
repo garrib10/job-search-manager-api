@@ -7,9 +7,9 @@
 ![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?logo=pytest&logoColor=white)
 ![Railway](https://img.shields.io/badge/Railway-0B0D0E?logo=railway&logoColor=white)
 
-A production-ready REST API built with **FastAPI**, **SQLAlchemy**, and **MySQL** for managing the complete job search process. The API allows users to track companies, job applications, interviews, and authentication through secure JWT-based authorization.
+A REST API built with **FastAPI**, **SQLAlchemy**, and **MySQL** for managing a job search. Each user registers, logs in with a JWT, and tracks their own companies, job applications, and interviews; one user's records are never visible to another.
 
-The project follows a layered architecture with separate routers, services, models, and schemas, includes automated testing with high code coverage, and is deployed to Railway with a production MySQL database.
+The project follows a layered architecture with separate routers, services, models, and schemas. Schema changes are managed with Alembic migrations, every pull request runs the test suite against MySQL in CI, and the API is deployed to Railway.
 
 ---
 
@@ -21,6 +21,8 @@ The project follows a layered architecture with separate routers, services, mode
 | Swagger UI      | https://job-search-manager-api-production.up.railway.app/docs   |
 | Health Endpoint | https://job-search-manager-api-production.up.railway.app/health |
 
+The live demo runs the latest release from the `main` branch. Work merged into `develop` appears there after the next release.
+
 ---
 
 ## Key Features
@@ -29,28 +31,34 @@ The project follows a layered architecture with separate routers, services, mode
 
 - Create, update, retrieve, and delete companies
 - Store company website, industry, location, and notes
-- Prevent duplicate company records
+- Paginated list ordered by name, then ID
+- A company that still has job applications can't be deleted (`409 Conflict`); delete or move its applications first
+- Company names don't have to be unique
 
 ### Job Application Management
 
 - Track job applications
 - Associate applications with companies
 - Store salary ranges, work arrangement, application status, and notes
-- Prevent duplicate job postings using unique job URLs
+- Prevent tracking the same posting twice: a job URL is unique per user, and different users can track the same posting
+- Deleting an application also deletes its interviews
 
 ### Interview Management
 
 - Schedule interviews
 - Track interview type, status, and outcome
-- Prevent duplicate interview scheduling
+- Prevent scheduling the same application twice at the same moment
 - Associate interviews with job applications
+- Times are sent with a UTC offset and returned in UTC
 
 ### Authentication
 
 - User registration
 - Secure password hashing with Argon2
 - JWT access tokens
-- Protected endpoints using HTTP Bearer Authentication
+- Every company, application, and interview endpoint requires a bearer token
+- Each user only sees and changes their own records; another user's record returns `404 Not Found`, the same as a missing one
+- Applications can only be filed under the user's own companies, and interviews under the user's own applications
 
 ### Search & Filtering
 
@@ -75,23 +83,27 @@ Interviews
 - Sorting
 - Pagination
 
+Companies
+
+- Pagination
+
 ### Validation & Error Handling
 
-- Global exception handlers
+- Global exception handlers with consistent error responses
 - Request validation with Pydantic
-- Duplicate resource detection
-- Foreign key validation
+- Required text is trimmed, and blank values are rejected
+- Notes are limited to 65,535 bytes (MySQL `TEXT`)
+- Datetimes must include a UTC offset (`2026-11-02T15:00:00Z`); values without one are rejected
+- Duplicate detection, plus a generic `409 Conflict` for database constraint conflicts (details are logged, never returned)
 - Date-range validation
-- Consistent API error responses
 
 ### Automated Testing
 
-- 70 automated tests
-- 98% code coverage
-- Dedicated MySQL test database
-- CRUD endpoint testing
-- JWT authentication testing
-- End-to-end API workflow testing
+- 213 automated tests, 99% code coverage
+- Dedicated MySQL test database, with a guard that refuses to reset any database whose name lacks `test` or matches `DB_NAME`
+- CRUD, validation, and end-to-end workflow tests
+- Authentication and cross-user isolation tests
+- Migration tests run against MySQL
 
 ---
 
@@ -116,6 +128,10 @@ Interviews
 - Pydantic
 - pydantic-settings
 
+### Database Migrations
+
+- Alembic
+
 ### Testing
 
 - Pytest
@@ -125,6 +141,11 @@ Interviews
 ### Documentation
 
 - Swagger / OpenAPI
+
+### CI and Security Scanning
+
+- GitHub Actions (tests, Ruff, migration checks)
+- CodeQL, Bandit, Dependency Review, Dependabot
 
 ### Deployment
 
@@ -158,26 +179,32 @@ The application follows a layered architecture that separates routing, business 
 
 ```text
 app/
-│
-├── models/
-├── routers/
-├── schemas/
-├── services/
-├── database.py
-├── security.py
-├── exceptions.py
-├── handlers.py
-├── config.py
-└── main.py
+├── enums/            # Status, type, and outcome enums
+├── exceptions/       # Application exceptions (not found, conflict, validation)
+├── handlers/         # Global exception handlers
+├── models/           # SQLAlchemy models
+├── routers/          # FastAPI routes
+├── schemas/          # Pydantic request/response models and shared field types
+├── services/         # Business logic and owner-scoped queries
+├── config.py         # Settings from environment variables
+├── database.py       # Engine, sessions, commit/rollback helper
+├── db_types.py       # UTC datetime column type
+├── security.py       # Password hashing and JWTs
+└── main.py           # FastAPI app
+
+alembic/              # Migration environment and versions/
+alembic.ini
+docs/
+├── database-migrations.md
+└── design-decisions.md
+scripts/
+└── compare_schema.py # Read-only schema check before adopting migrations
 
 tests/
-│
-├── conftest.py
-├── test_auth.py
-├── test_companies.py
-├── test_applications.py
-├── test_interviews.py
-└── ...
+├── conftest.py       # Fixtures, test database guard
+├── db_safety.py      # Guards for destructive test setup
+├── migration_utils.py
+└── test_*.py         # API, isolation, validation, and migration tests
 ```
 
 ---
@@ -189,6 +216,8 @@ tests/
 <img src="assets/swagger-ui.png" alt="Swagger UI" width="1000">
 
 ### Test Coverage Report
+
+Screenshot from v0.1.0 (70 tests). The current figures are under [Testing](#testing).
 
 <img src="assets/coverage-report.png" alt="Test Coverage Report" width="1000">
 
@@ -242,6 +271,8 @@ tests/
 | PUT    | `/interviews/{id}` |
 | DELETE | `/interviews/{id}` |
 
+All company, application, and interview endpoints require `Authorization: Bearer <JWT>` and only work with the logged-in user's records.
+
 ---
 
 ## Example Requests
@@ -279,6 +310,23 @@ GET /auth/me
 Authorization: Bearer <JWT>
 ```
 
+### Schedule an Interview
+
+```http
+POST /interviews
+Authorization: Bearer <JWT>
+```
+
+```json
+{
+  "application_id": 1,
+  "interview_type": "technical",
+  "scheduled_at": "2026-11-02T10:00:00-05:00"
+}
+```
+
+The response returns the time in UTC: `"scheduled_at": "2026-11-02T15:00:00Z"`.
+
 ---
 
 ## Local Development
@@ -302,6 +350,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Create the database schema
+
+The app does not create tables on startup. Apply the migrations to the database configured in `.env`:
+
+```bash
+alembic upgrade head
+```
+
+If your database was created by an older version of this project, adopt it instead of upgrading; see [docs/database-migrations.md](docs/database-migrations.md).
+
 ### Run the application
 
 ```bash
@@ -324,8 +382,12 @@ The project includes automated tests covering:
 - Companies
 - Job Applications
 - Interviews
-- Validation and exception handling
+- Cross-user isolation
+- Validation, timezones, and exception handling
+- Database migrations
 - End-to-end API workflows
+
+Tests need a disposable MySQL database set in `TEST_DATABASE_URL`. The suite drops and recreates its tables, and refuses to run unless the database name contains `test` and differs from `DB_NAME`.
 
 Run all tests:
 
@@ -341,8 +403,8 @@ python -m pytest --cov=app --cov-report=term-missing --cov-report=html
 
 Current test suite:
 
-- **70 automated tests**
-- **98% code coverage**
+- **213 automated tests**
+- **99% code coverage**
 
 ---
 
@@ -351,11 +413,9 @@ Current test suite:
 - Refresh tokens
 - Role-based authorization
 - Docker support
-- Alembic database migrations
 - Email notifications
 - Saved searches
 - Application reminders
-- CI/CD pipeline with GitHub Actions
 
 ---
 

@@ -41,10 +41,10 @@ This is a personal project maintained by one person, so response times are best 
 - Findings from automated scanners without a demonstrated impact.
 - Social engineering, and issues with GitHub or Railway themselves.
 
-**Known limitation (please don't report)**
+**Expected behavior (please don't report)**
 
-All authenticated users currently share the same companies, applications, and interviews. Every resource endpoint
-requires login, but records are not yet owned by a user. Per-user ownership is planned for v0.2.0.
+Requesting another user's company, application, or interview returns `404 Not Found`, the same response as for an ID
+that doesn't exist. This is intentional, so that record IDs belonging to other users can't be discovered.
 
 ## Testing guidelines
 

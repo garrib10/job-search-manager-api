@@ -1,11 +1,13 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+from app.db_types import UTCDateTime
 
 if TYPE_CHECKING:
     from app.models.application import JobApplication
+    from app.models.user import User
 
 
 
@@ -54,16 +56,29 @@ class Company(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        UTCDateTime,
         server_default=func.now(),
         nullable=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        UTCDateTime,
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    # WHY:
+    # Every company belongs to the user who created it. The constraint is
+    # named so migrations can drop or alter it reliably.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", name="fk_companies_user_id_users"),
+        nullable=False,
+        index=True,
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="companies",
     )
 
     applications: Mapped[list["JobApplication"]] = relationship(

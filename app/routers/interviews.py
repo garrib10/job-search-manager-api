@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Annotated, Literal
 from fastapi import (
     APIRouter,
@@ -19,7 +18,8 @@ from app.schemas import (
     InterviewResponse,
     InterviewUpdate,
 )
-from app.routers.auth import get_current_user
+from app.routers.auth import CurrentUser, get_current_user
+from app.schemas.types import UtcDatetime
 from app.services import interview_service
 
 
@@ -27,8 +27,10 @@ router = APIRouter(
     prefix="/interviews",
     tags=["Interviews"],
     # WHY:
-    # Every endpoint in this router requires a valid bearer token.
-    # Records are not yet scoped to the logged-in user (planned for v0.2.0).
+    # Every endpoint in this router requires a valid bearer token. Each
+    # endpoint also takes CurrentUser so the service can scope records to
+    # the logged-in user; this router-level dependency keeps any new
+    # endpoint protected by default.
     dependencies=[Depends(get_current_user)],
 )
 
@@ -43,6 +45,7 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 def create_interview(
     interview_data: InterviewCreate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> InterviewResponse:
     """
     Create a new interview.
@@ -54,6 +57,7 @@ def create_interview(
     return interview_service.create_interview(
         db,
         interview_data,
+        user_id=current_user.id,
     )
 
 @router.get(
@@ -63,12 +67,13 @@ def create_interview(
 )
 def get_interviews(
     db: DatabaseSession,
+    current_user: CurrentUser,
     application_id: int | None = None,
     interview_type: InterviewType | None = None,
     status_filter: InterviewStatus | None = None,
     outcome: InterviewOutcome | None = None,
-    scheduled_from: datetime | None = None,
-    scheduled_to: datetime | None = None,
+    scheduled_from: UtcDatetime | None = None,
+    scheduled_to: UtcDatetime | None = None,
     sort_order: Literal["asc", "desc"] = "asc",
     limit: int = Query(
         default=20,
@@ -89,6 +94,7 @@ def get_interviews(
     """
     return interview_service.get_interviews(
         db,
+        user_id=current_user.id,
         application_id=application_id,
         interview_type=interview_type,
         status_filter=status_filter,
@@ -108,6 +114,7 @@ def get_interviews(
 def get_interview(
     interview_id: int,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> InterviewResponse:
     """
     Return one interview by ID.
@@ -119,6 +126,7 @@ def get_interview(
     return interview_service.require_interview_by_id(
         db,
         interview_id,
+        user_id=current_user.id,
     )
 
 
@@ -131,6 +139,7 @@ def update_interview(
     interview_id: int,
     interview_data: InterviewUpdate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> InterviewResponse:
     """
     Update an existing interview.
@@ -142,12 +151,14 @@ def update_interview(
     interview = interview_service.require_interview_by_id(
         db,
         interview_id,
+        user_id=current_user.id,
     )
 
     return interview_service.update_interview(
         db,
         interview,
         interview_data,
+        user_id=current_user.id,
     )
 
 @router.delete(
@@ -158,12 +169,14 @@ def update_interview(
 def delete_interview(
     interview_id: int,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> Response:
     """Delete an existing interview."""
 
     interview = interview_service.require_interview_by_id(
         db,
         interview_id,
+        user_id=current_user.id,
     )
 
     interview_service.delete_interview(

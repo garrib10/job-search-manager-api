@@ -2,6 +2,7 @@ from datetime import date
 from typing import Literal
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
+from app.database import commit_or_rollback
 from app.enums import ApplicationStatus, WorkArrangement
 from app.exceptions import (
     ConflictException,
@@ -10,35 +11,27 @@ from app.exceptions import (
 )
 from app.models import Company, JobApplication
 from app.schemas import JobApplicationCreate, JobApplicationUpdate
-
-def get_company_by_id(
-    db: Session,
-    company_id: int,
-) -> Company | None:
-    """
-    Return a company by primary key.
-
-    WHY:
-    Nullable lookup helpers are still useful in cases where the caller
-    may want to inspect whether a company exists without immediately
-    treating the absence as an error.
-    """
-    return db.get(Company, company_id)
+from app.services.company_service import require_company_by_id
 
 
 def get_application_by_job_url(
     db: Session,
     job_url: str,
+    *,
+    user_id: int,
 ) -> JobApplication | None:
     """
-    Return a job application matching an exact job URL.
+    Return one of the user's job applications matching an exact job URL.
 
     WHY:
-    The project treats a job URL as unique so the same posting is not
-    accidentally tracked more than once.
+    A job URL is unique per user (uq_job_applications_user_id_job_url) so
+    the same posting is not tracked twice by one person, while different
+    users can each track the same posting. Checking only the user's own
+    applications also avoids revealing what other users track.
     """
     statement = select(JobApplication).where(
-        JobApplication.job_url == job_url
+        JobApplication.job_url == job_url,
+        JobApplication.user_id == user_id,
     )
 
     return db.scalar(statement)
@@ -46,16 +39,24 @@ def get_application_by_job_url(
 def require_application_by_id(
     db: Session,
     application_id: int,
+    *,
+    user_id: int,
 ) -> JobApplication:
     """
-    Return a job application or raise a not-found exception.
+    Return one of the user's job applications or raise a not-found exception.
 
     WHY:
     Database-dependent existence checks belong in the service layer.
+    Another user's application is reported exactly like a missing one.
     The global exception handler converts this exception into a
     consistent 404 HTTP response.
     """
-    application = db.get(JobApplication, application_id)
+    application = db.scalar(
+        select(JobApplication).where(
+            JobApplication.id == application_id,
+            JobApplication.user_id == user_id,
+        )
+    )
 
     if application is None:
         raise NotFoundException("Job application not found")
@@ -66,6 +67,8 @@ def require_application_by_id(
 def create_application(
     db: Session,
     application_data: JobApplicationCreate,
+    *,
+    user_id: int,
 ) -> JobApplication:
     """
     Create and persist a new job application.
@@ -73,20 +76,21 @@ def create_application(
     WHY:
     The service layer owns database-dependent business rules such as
     validating the referenced company and preventing duplicate job URLs.
+    The company must belong to the same user; another user's company is
+    reported as not found.
     """
-    company = db.get(
-        Company,
+    require_company_by_id(
+        db,
         application_data.company_id,
+        user_id=user_id,
     )
-
-    if company is None:
-        raise NotFoundException("Company not found")
 
     job_url = str(application_data.job_url)
 
     existing_application = get_application_by_job_url(
         db,
         job_url,
+        user_id=user_id,
     )
 
     if existing_application is not None:
@@ -105,10 +109,11 @@ def create_application(
         status=application_data.status,
         notes=application_data.notes,
         date_applied=application_data.date_applied,
+        user_id=user_id,
     )
 
     db.add(application)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(application)
 
     return application
@@ -116,6 +121,8 @@ def create_application(
 
 def get_applications(
     db: Session,
+    *,
+    user_id: int,
     status_filter: ApplicationStatus | None = None,
     company_id: int | None = None,
     company: str | None = None,
@@ -155,7 +162,9 @@ def get_applications(
             "date_applied_from cannot be after date_applied_to"
         )
 
-    statement = select(JobApplication)
+    statement = select(JobApplication).where(
+        JobApplication.user_id == user_id
+    )
 
     if status_filter is not None:
         statement = statement.where(
@@ -230,39 +239,33 @@ def get_applications(
     return list(db.scalars(statement).all())
 
 
-def get_application_by_id(
-    db: Session,
-    application_id: int,
-) -> JobApplication | None:
-    """Return one job application by primary key."""
-    return db.get(JobApplication, application_id)
-
-
 def update_application(
     db: Session,
     application: JobApplication,
     application_data: JobApplicationUpdate,
+    *,
+    user_id: int,
 ) -> JobApplication:
     """
     Update an existing job application.
 
     WHY:
-    The service validates database-dependent business rules before
-    applying the PUT update.
+    The service validates database-dependent business rules, including
+    that the new company belongs to the same user, before changing any
+    field, so a rejected update leaves the application untouched.
     """
-    company = db.get(
-        Company,
+    require_company_by_id(
+        db,
         application_data.company_id,
+        user_id=user_id,
     )
-
-    if company is None:
-        raise NotFoundException("Company not found")
 
     job_url = str(application_data.job_url)
 
     existing_application = get_application_by_job_url(
         db,
         job_url,
+        user_id=user_id,
     )
 
     if (
@@ -284,7 +287,7 @@ def update_application(
     application.notes = application_data.notes
     application.date_applied = application_data.date_applied
 
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(application)
 
     return application
@@ -297,4 +300,4 @@ def delete_application(
     """Delete an existing job application."""
 
     db.delete(application)
-    db.commit()
+    commit_or_rollback(db)

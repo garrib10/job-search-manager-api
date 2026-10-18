@@ -6,8 +6,8 @@ Every resource endpoint requires a valid bearer token. These tests use the
 plain (unauthenticated) `client` fixture and only send a token when a test
 needs one, so a route that loses its protection fails here.
 
-Records are still shared by all authenticated users until ownership is added
-in v0.2.0; these tests only cover authentication, not data isolation.
+These tests only cover authentication. Isolation between authenticated users
+is covered in tests/test_isolation.py.
 """
 
 from datetime import timedelta
@@ -26,7 +26,7 @@ APPLICATION_BODY = {
 INTERVIEW_BODY = {
     "application_id": 1,
     "interview_type": "technical",
-    "scheduled_at": "2026-11-02T15:00:00",
+    "scheduled_at": "2026-11-02T15:00:00Z",
 }
 
 # (HTTP method, route template, concrete path, request body)
@@ -134,7 +134,7 @@ def test_rejected_writes_do_not_change_data(client, auth_headers):
         ("POST", "/applications", {**APPLICATION_BODY, "company_id": company["id"], "job_url": "https://example.com/jobs/other"}),
         ("PUT", f"/applications/{application['id']}", {**APPLICATION_BODY, "company_id": company["id"], "job_title": "Changed"}),
         ("DELETE", f"/applications/{application['id']}", None),
-        ("POST", "/interviews", {**INTERVIEW_BODY, "application_id": application["id"], "scheduled_at": "2026-11-03T15:00:00"}),
+        ("POST", "/interviews", {**INTERVIEW_BODY, "application_id": application["id"], "scheduled_at": "2026-11-03T15:00:00Z"}),
         ("PUT", f"/interviews/{interview['id']}", {**INTERVIEW_BODY, "application_id": application["id"], "interviewer": "Changed"}),
         ("DELETE", f"/interviews/{interview['id']}", None),
     ]

@@ -1,12 +1,15 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.exceptions import NotFoundException
-from app.models import Company
+from app.database import commit_or_rollback
+from app.exceptions import ConflictException, NotFoundException
+from app.models import Company, JobApplication
 from app.schemas import CompanyCreate, CompanyUpdate
 
 def create_company(
     db: Session,
     company_data: CompanyCreate,
+    *,
+    user_id: int,
 ) -> Company:
     """
     Create and persist a new company.
@@ -21,10 +24,11 @@ def create_company(
         industry=company_data.industry,
         location=company_data.location,
         notes=company_data.notes,
+        user_id=user_id,
     )
 
     db.add(company)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(company)
 
     return company
@@ -32,36 +36,45 @@ def create_company(
 
 def get_companies(
     db: Session,
+    *,
+    user_id: int,
+    limit: int = 20,
+    offset: int = 0,
 ) -> list[Company]:
-    """Return all companies ordered alphabetically by name."""
+    """Return a page of the user's companies ordered by name, then ID."""
 
-    statement = select(Company).order_by(Company.name)
+    statement = (
+        select(Company)
+        .where(Company.user_id == user_id)
+        .order_by(Company.name, Company.id)
+        .limit(limit)
+        .offset(offset)
+    )
 
     return list(db.scalars(statement).all())
-
-
-def get_company_by_id(
-    db: Session,
-    company_id: int,
-) -> Company | None:
-    """Return one company, or None when the ID does not exist."""
-
-    return db.get(Company, company_id)
 
 
 def require_company_by_id(
     db: Session,
     company_id: int,
+    *,
+    user_id: int,
 ) -> Company:
     """
-    Return one company or raise an application-level not-found error.
+    Return one of the user's companies or raise a not-found error.
 
     WHY:
     Database-dependent existence checks belong in the service layer.
-    The global exception handler converts this exception into a
-    consistent 404 response.
+    Another user's company is reported exactly like a missing one, so
+    the API never reveals which IDs exist. The global exception handler
+    converts this exception into a consistent 404 response.
     """
-    company = db.get(Company, company_id)
+    company = db.scalar(
+        select(Company).where(
+            Company.id == company_id,
+            Company.user_id == user_id,
+        )
+    )
 
     if company is None:
         raise NotFoundException("Company not found")
@@ -86,17 +99,42 @@ def update_company(
     company.location = company_data.location
     company.notes = company_data.notes
 
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(company)
 
     return company
+
+
+def company_has_applications(
+    db: Session,
+    company_id: int,
+) -> bool:
+    """Return True if any job application is filed under the company."""
+    return db.scalar(
+        select(JobApplication.id)
+        .where(JobApplication.company_id == company_id)
+        .limit(1)
+    ) is not None
 
 
 def delete_company(
     db: Session,
     company: Company,
 ) -> None:
-    """Delete an existing company."""
+    """
+    Delete a company that has no job applications.
+
+    WHY:
+    Deleting a company must not silently delete the applications filed
+    under it. The user has to delete or move those applications first. The
+    foreign key from job_applications also blocks the delete in the
+    database, so a concurrent request that adds an application still ends
+    in a 409 rather than orphaned data.
+    """
+    if company_has_applications(db, company.id):
+        raise ConflictException(
+            "Company has job applications. Delete or move them first."
+        )
 
     db.delete(company)
-    db.commit()
+    commit_or_rollback(db)

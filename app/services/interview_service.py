@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.database import commit_or_rollback
 from app.enums import (
     InterviewOutcome,
     InterviewStatus,
@@ -14,34 +15,41 @@ from app.exceptions import (
 )
 from app.models import Interview, JobApplication
 from app.schemas import InterviewCreate, InterviewUpdate
+from app.services.application_service import require_application_by_id
 
-def get_application_by_id(
-    db: Session,
-    application_id: int,
-) -> JobApplication | None:
+def owned_interviews(user_id: int):
     """
-    Return a job application by primary key.
+    Select interviews whose job application belongs to the user.
 
     WHY:
-    Nullable lookup helpers remain useful when the caller wants to
-    inspect whether an application exists without immediately treating
-    its absence as an error.
+    Interviews have no user_id of their own; they belong to whoever owns
+    their job application.
     """
-    return db.get(JobApplication, application_id)
+    return (
+        select(Interview)
+        .join(Interview.application)
+        .where(JobApplication.user_id == user_id)
+    )
+
 
 def require_interview_by_id(
     db: Session,
     interview_id: int,
+    *,
+    user_id: int,
 ) -> Interview:
     """
-    Return an interview or raise a not-found exception.
+    Return one of the user's interviews or raise a not-found exception.
 
     WHY:
-    Resource existence checks belong in the service layer.
-    The global exception handler converts this exception into
-    a consistent 404 HTTP response.
+    Resource existence checks belong in the service layer. Another
+    user's interview is reported exactly like a missing one. The global
+    exception handler converts this exception into a consistent 404
+    HTTP response.
     """
-    interview = db.get(Interview, interview_id)
+    interview = db.scalar(
+        owned_interviews(user_id).where(Interview.id == interview_id)
+    )
 
     if interview is None:
         raise NotFoundException("Interview not found")
@@ -71,6 +79,8 @@ def get_interview_by_application_and_time(
 def create_interview(
     db: Session,
     interview_data: InterviewCreate,
+    *,
+    user_id: int,
 ) -> Interview:
     """
     Create and persist a new interview.
@@ -78,15 +88,15 @@ def create_interview(
     WHY:
     The service layer owns database-dependent business rules,
     including validating the JobApplication relationship and
-    preventing duplicate interview scheduling.
+    preventing duplicate interview scheduling. The application must
+    belong to the same user; another user's application is reported as
+    not found.
     """
-    application = db.get(
-        JobApplication,
+    require_application_by_id(
+        db,
         interview_data.application_id,
+        user_id=user_id,
     )
-
-    if application is None:
-        raise NotFoundException("Job application not found")
 
     existing_interview = get_interview_by_application_and_time(
         db,
@@ -111,13 +121,15 @@ def create_interview(
     )
 
     db.add(interview)
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(interview)
 
     return interview
 
 def get_interviews(
     db: Session,
+    *,
+    user_id: int,
     application_id: int | None = None,
     interview_type: InterviewType | None = None,
     status_filter: InterviewStatus | None = None,
@@ -145,7 +157,7 @@ def get_interviews(
             "scheduled_from cannot be after scheduled_to"
         )
 
-    statement = select(Interview)
+    statement = owned_interviews(user_id)
 
     if application_id is not None:
         statement = statement.where(
@@ -192,33 +204,26 @@ def get_interviews(
 
     return list(db.scalars(statement).all())
 
-def get_interview_by_id(
-    db: Session,
-    interview_id: int,
-) -> Interview | None:
-    """Return one interview by primary key."""
-
-    return db.get(Interview, interview_id)
-
 def update_interview(
     db: Session,
     interview: Interview,
     interview_data: InterviewUpdate,
+    *,
+    user_id: int,
 ) -> Interview:
     """
     Update an existing interview.
 
     WHY:
-    The service validates database-dependent business rules before
-    applying the PUT update.
+    The service validates database-dependent business rules, including
+    that the new application belongs to the same user, before changing
+    any field, so a rejected update leaves the interview untouched.
     """
-    application = db.get(
-        JobApplication,
+    require_application_by_id(
+        db,
         interview_data.application_id,
+        user_id=user_id,
     )
-
-    if application is None:
-        raise NotFoundException("Job application not found")
 
     existing_interview = get_interview_by_application_and_time(
         db,
@@ -243,7 +248,7 @@ def update_interview(
     interview.location = interview_data.location
     interview.notes = interview_data.notes
 
-    db.commit()
+    commit_or_rollback(db)
     db.refresh(interview)
 
     return interview
@@ -255,4 +260,4 @@ def delete_interview(
     """Delete an existing interview."""
 
     db.delete(interview)
-    db.commit()
+    commit_or_rollback(db)

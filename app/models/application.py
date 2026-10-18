@@ -3,21 +3,23 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from sqlalchemy import (
     Date,
-    DateTime,
     Enum,
     ForeignKey,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+from app.db_types import UTCDateTime
 from app.enums import ApplicationStatus, WorkArrangement
 
 if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.interview import Interview
+    from app.models.user import User
 
 
 class JobApplication(Base):
@@ -31,6 +33,17 @@ class JobApplication(Base):
     """
 
     __tablename__ = "job_applications"
+
+    # WHY:
+    # A job URL identifies a posting, so the same user can't track it twice,
+    # but different users can each track the same posting.
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "job_url",
+            name="uq_job_applications_user_id_job_url",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
@@ -81,7 +94,6 @@ class JobApplication(Base):
     job_url: Mapped[str] = mapped_column(
         String(500),
         nullable=False,
-        unique=True,
     )
 
     notes: Mapped[str | None] = mapped_column(
@@ -101,13 +113,13 @@ class JobApplication(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        UTCDateTime,
         nullable=False,
         server_default=func.now(),
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        UTCDateTime,
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
@@ -123,6 +135,27 @@ class JobApplication(Base):
         back_populates="applications",
     )
 
+    # WHY:
+    # Applications store their owner directly so they can be filtered by user
+    # without joining through Company. Interviews inherit ownership through
+    # their application and have no user_id of their own.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", name="fk_job_applications_user_id_users"),
+        nullable=False,
+        index=True,
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="applications",
+    )
+
+    # WHY:
+    # Deleting an application deletes its interviews. The ORM cascade
+    # handles interviews already loaded in the session; passive_deletes
+    # lets the database's ON DELETE CASCADE remove the rest without
+    # loading them first.
     interviews: Mapped[list["Interview"]] = relationship(
         back_populates="application",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     ) 
