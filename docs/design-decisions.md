@@ -16,6 +16,7 @@ Each entry records a question about how the project works, the decision made, wh
 10. [What happens on delete, duplicates, and database conflicts?](#what-happens-on-delete-duplicates-and-database-conflicts)
 11. [How are dates, times, and text inputs validated?](#how-are-dates-times-and-text-inputs-validated)
 12. [How is the README kept accurate?](#how-is-the-readme-kept-accurate)
+13. [How is the app deployed and migrated on Railway?](#how-is-the-app-deployed-and-migrated-on-railway)
 
 ---
 
@@ -381,4 +382,32 @@ The new rules apply only to **requests**. Response models accept what's already 
 
 - The test count must be updated whenever tests are added. It's a number, not a badge, until CI reporting is added in v0.3.0.
 - The README describes `develop` once these changes are merged. The live demo only matches it after the next release; the README says so rather than claiming features are already deployed.
+
+---
+
+## How is the app deployed and migrated on Railway?
+
+**Decision**
+
+- `railway.json` in the repository defines how Railway runs the app:
+  - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+  - Pre-deploy command: `alembic upgrade head`.
+  - Health check path: `/health`.
+- `.python-version` pins Python **3.12**. Railway's builder reads it, and both CI jobs read the same file (`setup-python`'s `python-version-file`), so production and CI use the same minor version.
+- The builder isn't pinned in `railway.json`; the service keeps whichever builder it already uses.
+
+**Why**
+
+- **Settings in the repository are reviewed and versioned.** Before this, the start command lived only in the Railway dashboard, where a change leaves no history and can't be reviewed in a pull request. Railway applies `railway.json` on every deploy and uses it in place of the dashboard values.
+- **Migrations run before traffic switches.** Railway runs the pre-deploy command in the new build, with the service's environment variables, before starting it. If the migration fails, the deploy stops and the previous version keeps serving. This replaces the manual `alembic upgrade head` step from the v0.2.0 release.
+- **`$PORT` and `0.0.0.0`:** Railway assigns the port and health-checks it, and the server must listen on all interfaces to be reachable inside Railway's network. The start command runs in a shell for Railpack builds, so `$PORT` expands.
+- **The Python pin closes a gap.** Without a pin, Railpack defaults to Python 3.13 while CI tests on 3.12, so production could run a version nothing was tested on. One file now drives both.
+- **Not pinning the builder** avoids changing how the existing service builds as a side effect of this change. Both builders Railway offers for this repository (Railpack and Nixpacks) honor `.python-version`.
+
+**Trade-off**
+
+- **A failed migration blocks the deploy.** That's intended, but it means a broken migration stops a release until it's fixed. The pre-deploy logs in Railway show why.
+- Migrations that need input (`-x owner_email=...`) or that would break the still-running old version still need manual steps before the release (see `docs/database-migrations.md`).
+- The health check only confirms the process is serving HTTP; it doesn't check the database connection. A database outage is reported by failing requests, not by the deploy.
+- Upgrading Python means editing `.python-version`. CI follows automatically, and the change is reviewed like any other.
 

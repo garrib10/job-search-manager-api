@@ -15,7 +15,8 @@ Run all commands from the repository root with the virtual environment active.
 5. [Adopt Alembic for an existing database](#adopt-alembic-for-an-existing-database)
 6. [Ownership migration](#ownership-migration)
 7. [Status of existing databases](#status-of-existing-databases)
-8. [Test database safeguards](#test-database-safeguards)
+8. [Migrations on deploy (Railway)](#migrations-on-deploy-railway)
+9. [Test database safeguards](#test-database-safeguards)
 
 ## Initialize an empty database
 
@@ -243,9 +244,19 @@ Before you start:
 | --- | --- |
 | CI (`job_search_ci_app`) | Created fresh by `alembic upgrade head` on every run |
 | Local development | Created by `create_all()`; needs the adoption steps above, then `alembic -x owner_email=<your local account> upgrade head` |
-| Railway production | Created by `create_all()`; **not stamped yet**. Must be adopted (steps above), then migrated with the [ownership steps](#production-steps-railway). Owner for existing rows **not chosen yet** |
+| Railway production | Adopted on 2026-10-18 for v0.2.0: backed up, stamped at the baseline, test data cleared, and migrated to `9e9a352c0176` |
 
-Until migrations run automatically on deploy (planned for v0.3.0), apply them manually with `alembic upgrade head` against production before deploying code that depends on them.
+## Migrations on deploy (Railway)
+
+`railway.json` sets a **pre-deploy command**, `alembic upgrade head`. On every deploy, Railway builds the new version and runs that command with the service's environment variables **before** switching traffic to it:
+
+- If it succeeds (exit code 0), the new version starts. When the database is already at the latest revision, it does nothing.
+- If it fails (non-zero exit code), **the deployment stops** and the previous version keeps running. The command is not retried. Check the deployment's pre-deploy logs, fix the cause, and redeploy.
+
+This replaces running `alembic upgrade head` by hand before each release. Two kinds of change still need manual steps:
+
+- **Migrations that need input.** For example, the ownership migration's stage 2 needs `-x owner_email=...` when unowned rows exist. Run those by hand (as in [Production steps](#production-steps-railway)) **before** merging the release; the pre-deploy command will then find nothing left to do.
+- **Changes the running version can't handle.** The pre-deploy command runs while the old version is still serving traffic. A migration that breaks the old code, such as dropping a column it still reads, should be split across releases: add first, remove later.
 
 ## Test database safeguards
 
