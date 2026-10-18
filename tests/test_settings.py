@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from app.config import (
-    MIN_JWT_SECRET_BYTES,
+    MIN_HMAC_BYTES,
     Settings,
     SettingsError,
     check_settings,
@@ -62,7 +62,7 @@ def test_production_rejects_a_short_secret(app_env):
     assert WEAK_SECRET not in message
 
 
-@pytest.mark.parametrize(("algorithm", "required"), sorted(MIN_JWT_SECRET_BYTES.items()))
+@pytest.mark.parametrize(("algorithm", "required"), sorted(MIN_HMAC_BYTES.items()))
 def test_minimum_secret_length_follows_the_algorithm(algorithm, required):
     check_settings(make_settings(jwt_algorithm=algorithm, jwt_secret_key="k" * required))
 
@@ -88,8 +88,8 @@ def test_production_rejects_repository_placeholders(placeholder):
     ("overrides", "message"),
     [
         ({"db_password": ""}, "DB_PASSWORD is empty"),
-        ({"access_token_expire_minutes": 0}, "ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 1440"),
-        ({"access_token_expire_minutes": 1441}, "ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and 1440"),
+        ({"access_token_expire_minutes": 0}, "ACCESS_TOKEN_EXPIRE_MINUTES is not between 1 and 1440"),
+        ({"access_token_expire_minutes": 1441}, "ACCESS_TOKEN_EXPIRE_MINUTES is not between 1 and 1440"),
     ],
 )
 def test_production_rejects_other_unsafe_settings(overrides, message):
@@ -115,8 +115,9 @@ def test_other_environments_warn_but_keep_running(app_env, caplog):
     with caplog.at_level(logging.WARNING, logger="app.config"):
         check_settings(make_settings(app_env=app_env, jwt_secret_key=WEAK_SECRET))
 
-    assert "would be refused in production" in caplog.text
+    assert "would be refused in production: JWT_SECRET_KEY" in caplog.text
     assert WEAK_SECRET not in caplog.text
+    assert "bytes" not in caplog.text  # only variable names are logged
 
 
 def test_invalid_configuration_is_reported_without_values(monkeypatch):
