@@ -19,6 +19,7 @@ Each entry records a question about how the project works, the decision made, wh
 13. [How is the app deployed and migrated on Railway?](#how-is-the-app-deployed-and-migrated-on-railway)
 14. [What stops the app from running with unsafe production settings?](#what-stops-the-app-from-running-with-unsafe-production-settings)
 15. [How are search, filters, sorting, and pagination tested under ownership?](#how-are-search-filters-sorting-and-pagination-tested-under-ownership)
+16. [How does a new developer get from a clone to passing tests?](#how-does-a-new-developer-get-from-a-clone-to-passing-tests)
 
 ---
 
@@ -480,4 +481,36 @@ Each test computes its expected result from the current user's own records and c
 - Removing the *ascending* ID tie-breaker isn't detected: MySQL happens to return tied rows in ascending ID order for these tables, so the result is the same without it. The tie-breaker stays because that order isn't guaranteed.
 - The list endpoints have no total-count field, so there is no count to verify; if one is added, it needs the same two-user test.
 - The fixture creates 15 records per test. It's slower than a single-user setup, which is the price of realistic overlap.
+
+---
+
+## How does a new developer get from a clone to passing tests?
+
+**Decision**
+
+The README's **Local Development** section is one ordered path:
+
+1. Prerequisites: Python 3.12 from `.python-version`, MySQL 8.4+.
+2. Clone, virtual environment, `pip install`.
+3. SQL to create the app database, a separate test database, and a non-root user.
+4. `.env` from `.env.example`, with a table of every variable.
+5. `alembic upgrade head`.
+6. `uvicorn` and the Swagger login flow.
+
+**Testing** lists the same commands CI runs: pytest with coverage, Ruff at CI's pinned version, and the migration checks. **Deployment** documents `railway.json`, the pre-deploy migration, and the production settings that block startup. A CI badge links to the actual `ci.yml` workflow on `main`.
+
+**Why**
+
+- **The steps were there but incomplete.** The previous instructions said "install and run" but never covered creating the databases, filling in `.env`, or the test database the suite requires. A new developer would hit the test-database guard or a missing-table error with no explanation.
+- **Two databases are explained up front** because the guard refuses to run tests against `DB_NAME`, a deliberate safety rule that looks like a bug if it isn't stated.
+- **Commands match CI** so a passing local run means a passing pull request, including the Ruff version, which isn't in `requirements.txt`.
+- **Production rules belong next to deployment:** someone setting up Railway needs to know that a short `JWT_SECRET_KEY` stops startup before they deploy, not from a failed deploy log.
+- **The path was followed from a fresh clone** in a scratch folder with a new virtual environment (see the #27 pull request for exactly what was and wasn't exercised).
+
+**Trade-off**
+
+- The README is longer. The quick path is still steps 1–5, and the details are in tables that can be skimmed.
+- Database creation needs MySQL `root`, which varies by installation (Homebrew, the Oracle installer, Docker); the README gives the SQL rather than installer-specific instructions.
+- The test count in the README must be updated as tests are added.
+- Ruff stays outside `requirements.txt` (the optional dependency split was skipped), so it's installed separately.
 

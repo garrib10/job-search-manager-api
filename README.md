@@ -1,5 +1,6 @@
 # Job Search Manager API
 
+[![CI](https://github.com/garrib10/job-search-manager-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/garrib10/job-search-manager-api/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-D71F00?logo=sqlalchemy&logoColor=white)
@@ -331,80 +332,152 @@ The response returns the time in UTC: `"scheduled_at": "2026-11-02T15:00:00Z"`.
 
 ## Local Development
 
-### Clone
+These steps take a fresh clone to a running API and a passing test suite.
+
+### Prerequisites
+
+- **Python 3.12.** The version is pinned in `.python-version`, which CI and Railway also read.
+- **MySQL 8.4 or newer.** CI tests on 8.4; production runs 9.x.
+- Git.
+
+### 1. Clone and create a virtual environment
 
 ```bash
-git clone <repository-url>
-```
-
-### Create a virtual environment
-
-```bash
+git clone https://github.com/garrib10/job-search-manager-api.git
+cd job-search-manager-api
 python3.12 -m venv .venv
 source .venv/bin/activate
-```
-
-### Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-### Create the database schema
+### 2. Create the databases
 
-The app does not create tables on startup. Apply the migrations to the database configured in `.env`:
+You need **two** databases: one for the app, and a separate, disposable one for the tests. The test suite drops and recreates every table in its database, and refuses to run unless that database's name contains `test` and differs from the app database.
+
+As the MySQL `root` user (`mysql -u root -p`), create both databases and a user for the app (choose your own password):
+
+```sql
+CREATE DATABASE job_search_manager;
+CREATE DATABASE job_search_manager_test;
+CREATE USER 'job_manager_user'@'localhost' IDENTIFIED BY 'choose-a-password';
+GRANT ALL PRIVILEGES ON job_search_manager.* TO 'job_manager_user'@'localhost';
+GRANT ALL PRIVILEGES ON job_search_manager_test.* TO 'job_manager_user'@'localhost';
+```
+
+### 3. Configure `.env`
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env`:
+
+| Variable | Required | Value |
+| --- | --- | --- |
+| `DB_HOST`, `DB_PORT` | Yes (port defaults to 3306) | `localhost`, `3306` |
+| `DB_NAME` | Yes | `job_search_manager` |
+| `DB_USER`, `DB_PASSWORD` | Yes | The MySQL user and password from step 2 |
+| `TEST_DATABASE_URL` | For tests | `mysql+pymysql://job_manager_user:<password>@localhost:3306/job_search_manager_test` |
+| `JWT_SECRET_KEY` | Yes | A random value of at least 32 bytes: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+| `JWT_ALGORITHM` | No (default `HS256`) | `HS256`, `HS384`, or `HS512` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No (default `30`) | Login token lifetime |
+| `APP_ENV` | No (default `development`) | Keep `development` locally. See [Deployment](#deployment) for what `production` enforces |
+
+`.env` is git-ignored. Never commit real values.
+
+If the test password contains special characters (`@`, `:`, `/`, `%`), URL-encode it in `TEST_DATABASE_URL`.
+
+### 4. Create the schema
+
+The app never creates tables on startup. Apply the migrations:
 
 ```bash
 alembic upgrade head
 ```
 
-If your database was created by an older version of this project, adopt it instead of upgrading; see [docs/database-migrations.md](docs/database-migrations.md).
+If your database was created by an older version of this project, adopt it instead; see [docs/database-migrations.md](docs/database-migrations.md).
 
-### Run the application
+### 5. Run the API
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Swagger:
+Open http://127.0.0.1:8000/docs:
 
-```
-http://127.0.0.1:8000/docs
-```
+1. Call `POST /auth/register`, then `POST /auth/login`.
+2. Click **Authorize** and paste the `access_token`.
+3. The company, application, and interview endpoints now work with your account.
 
 ---
 
 ## Testing
 
-The project includes automated tests covering:
+The tests use the database in `TEST_DATABASE_URL` from step 3, never `DB_NAME`.
 
-- Authentication
-- Companies
-- Job Applications
-- Interviews
-- Cross-user isolation
+Run the tests with coverage:
+
+```bash
+python -m pytest --cov=app --cov-report=term-missing
+```
+
+Run the same lint check as CI. Ruff isn't in `requirements.txt`; CI installs this exact version:
+
+```bash
+pip install ruff==0.17.1
+ruff check .
+```
+
+Check that the migrations match the models, as CI does. This runs against `DB_NAME`:
+
+```bash
+alembic upgrade head
+alembic check
+python -m scripts.compare_schema
+```
+
+The suite covers:
+
+- Authentication and the production settings guard
+- Companies, job applications, and interviews
+- Cross-user isolation, including search, filters, sorting, and pagination with interleaved data from two users
 - Validation, timezones, and exception handling
 - Database migrations
-- End-to-end API workflows
-
-Tests need a disposable MySQL database set in `TEST_DATABASE_URL`. The suite drops and recreates its tables, and refuses to run unless the database name contains `test` and differs from `DB_NAME`.
-
-Run all tests:
-
-```bash
-python -m pytest
-```
-
-Generate a coverage report:
-
-```bash
-python -m pytest --cov=app --cov-report=term-missing --cov-report=html
-```
+- Deployment configuration and end-to-end workflows
 
 Current test suite:
 
-- **213 automated tests**
+- **277 automated tests**
 - **99% code coverage**
+
+Every pull request runs these checks in GitHub Actions against a disposable MySQL 8.4 database, alongside CodeQL, Bandit, and Dependency Review.
+
+---
+
+## Deployment
+
+The API is deployed on [Railway](https://railway.com) from the `main` branch. The deployment settings are in the repository:
+
+| File | Purpose |
+| --- | --- |
+| `railway.json` | Start command (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`), pre-deploy command (`alembic upgrade head`), and health check (`/health`) |
+| `.python-version` | Python 3.12, also used by CI |
+
+On each deploy, Railway runs the migrations **before** switching traffic to the new version. If a migration fails, the deploy stops and the previous version keeps running. Migrations that need manual input are described in [docs/database-migrations.md](docs/database-migrations.md#migrations-on-deploy-railway).
+
+### Required production settings
+
+Set these as variables on the Railway service. With `APP_ENV=production`, the app (and the pre-deploy migration) **refuses to start** if any of them are unsafe:
+
+| Variable | Requirement |
+| --- | --- |
+| `APP_ENV` | `production` |
+| `JWT_SECRET_KEY` | At least 32 bytes for HS256 (48 for HS384, 64 for HS512), and not a value from this repository |
+| `JWT_ALGORITHM` | `HS256`, `HS384`, or `HS512` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Between 1 and 1440 |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | The Railway MySQL connection; `DB_PASSWORD` must not be empty |
+
+The startup error names each problem without showing any values. Changing `JWT_SECRET_KEY` signs out existing users; they just log in again.
 
 ---
 
