@@ -95,13 +95,15 @@ Instead, **stamp** the database: `alembic stamp` writes the revision ID into `al
 
    Empty output means it has never been stamped. If it shows a revision, stop: it is already managed by Alembic.
 
-4. **Compare the schema with the models (read-only):**
+4. **Compare the schema with the baseline models (read-only).** The models in the latest code include changes from later migrations (such as `user_id`), so compare using the code as it was when the baseline was the latest revision, commit `eaf5ef2` (the merge of #18):
 
    ```bash
+   git switch --detach eaf5ef2
    python -m scripts.compare_schema
+   git switch -              # back to the branch you were on
    ```
 
-   Continue only if it prints `Schema matches the models.` The baseline was verified to produce exactly the same tables, columns, indexes, unique keys, and foreign keys as `create_all()`, so a database created by `create_all()` from the current models should match.
+   Continue only if it prints `Schema matches the models.` The baseline was verified to produce exactly the same tables, columns, indexes, unique keys, and foreign keys as `create_all()`, so a database created by `create_all()` before ownership was added should match. Running the comparison from the latest code instead would report the later columns as missing even when the database matches the baseline.
 
 5. **Stamp it at the baseline revision.** Use the explicit revision ID, not `head`, so that later migrations are not skipped:
 
