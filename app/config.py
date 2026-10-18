@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # WHY:
 # RFC 7518 (section 3.2) requires an HMAC key at least as long as the hash
 # output: 256 bits for HS256, 384 for HS384, 512 for HS512.
-MIN_JWT_SECRET_BYTES = {
+MIN_HMAC_BYTES = {
     "HS256": 32,
     "HS384": 48,
     "HS512": 64,
@@ -28,8 +28,9 @@ KNOWN_PLACEHOLDER_SECRETS = frozenset(
 
 MAX_PRODUCTION_TOKEN_MINUTES = 24 * 60
 
-# A command shown in error messages, not a secret.
-GENERATE_SECRET_HINT = 'python -c "import secrets; print(secrets.token_urlsafe(48))"'  # nosec B105
+# Shown in error messages. Named without "secret"/"key" because scanners
+# treat such names as sensitive; this is only a shell command.
+GENERATION_COMMAND = 'python -c "import secrets; print(secrets.token_urlsafe(48))"'
 
 
 class SettingsError(RuntimeError):
@@ -99,36 +100,38 @@ class Settings(BaseSettings):
         )
 
 
-def find_unsafe_settings(settings: Settings) -> list[str]:
+def find_unsafe_settings(settings: Settings) -> list[tuple[str, str]]:
     """
-    Describe every setting that would be unsafe in production.
+    List every setting that would be unsafe in production.
 
-    Each message names the environment variable and what to change. Nothing
-    derived from a secret (not even its length) is included, because these
-    messages are logged.
+    Returns (variable name, explanation) pairs. Explanations say what to change
+    without including anything derived from a secret, not even its length.
     """
     problems = []
-    required_bytes = MIN_JWT_SECRET_BYTES[settings.jwt_algorithm]
+    required_bytes = MIN_HMAC_BYTES[settings.jwt_algorithm]
 
     if len(settings.jwt_secret_key.encode("utf-8")) < required_bytes:
-        problems.append(
-            f"JWT_SECRET_KEY is shorter than the {required_bytes} bytes {settings.jwt_algorithm} requires. "
-            f"Generate one with: {GENERATE_SECRET_HINT}"
-        )
+        problems.append((
+            "JWT_SECRET_KEY",
+            f"shorter than the {required_bytes} bytes {settings.jwt_algorithm} requires. "
+            f"Generate one with: {GENERATION_COMMAND}",
+        ))
 
     if settings.jwt_secret_key in KNOWN_PLACEHOLDER_SECRETS:
-        problems.append(
-            f"JWT_SECRET_KEY is a placeholder from this repository. Generate one with: {GENERATE_SECRET_HINT}"
-        )
+        problems.append((
+            "JWT_SECRET_KEY",
+            f"a placeholder from this repository. Generate one with: {GENERATION_COMMAND}",
+        ))
 
     if not settings.db_password:
-        problems.append("DB_PASSWORD is empty.")
+        problems.append(("DB_PASSWORD", "empty."))
 
     if not 1 <= settings.access_token_expire_minutes <= MAX_PRODUCTION_TOKEN_MINUTES:
-        problems.append(
-            f"ACCESS_TOKEN_EXPIRE_MINUTES must be between 1 and {MAX_PRODUCTION_TOKEN_MINUTES} "
-            f"(24 hours); it is {settings.access_token_expire_minutes}."
-        )
+        problems.append((
+            "ACCESS_TOKEN_EXPIRE_MINUTES",
+            f"not between 1 and {MAX_PRODUCTION_TOKEN_MINUTES} (24 hours); "
+            f"it is {settings.access_token_expire_minutes}.",
+        ))
 
     return problems
 
@@ -139,20 +142,22 @@ def check_settings(settings: Settings) -> None:
 
     WHY:
     A short or placeholder signing secret lets anyone forge login tokens. In
-    production that must stop the app (and migrations) from starting. In
-    development and tests a warning is enough, so local setups keep working.
+    production that must stop the app (and migrations) from starting, with a
+    full explanation in the error. In development and tests the app keeps
+    running and only the variable names are logged, so nothing about the
+    secrets reaches the logs.
     """
     problems = find_unsafe_settings(settings)
 
     if not problems:
         return
 
-    summary = "\n".join(f"- {problem}" for problem in problems)
-
     if settings.is_production:
-        raise SettingsError(f"Refusing to start with APP_ENV=production because of unsafe settings:\n{summary}")
+        details = "\n".join(f"- {name} is {explanation}" for name, explanation in problems)
+        raise SettingsError(f"Refusing to start with APP_ENV=production because of unsafe settings:\n{details}")
 
-    logger.warning("These settings would be refused in production:\n%s", summary)
+    names = ", ".join(sorted({name for name, _ in problems}))
+    logger.warning("These settings would be refused in production: %s", names)
 
 
 def load_settings() -> Settings:

@@ -430,7 +430,7 @@ In every environment:
 - `JWT_ALGORITHM` must be `HS256`, `HS384`, or `HS512`.
 - Configuration errors (a missing variable, a non-numeric port) are reported **by variable name only**.
 
-In development, test, and CI, the production checks only log a warning.
+In development, test, and CI, the app keeps running and logs a warning that names the variables production would refuse (names only).
 
 **Why**
 
@@ -438,7 +438,7 @@ In development, test, and CI, the production checks only log a warning.
 - **Failing at startup is the safest moment.** `get_settings()` runs when the app, Alembic, and the scripts import their settings, so a bad production configuration stops Railway's pre-deploy migration and the new version never takes traffic. The previous version keeps running.
 - **Secrets stay out of logs.** Pydantic's validation errors include the submitted input, so a missing `DB_HOST` would have printed the password and signing secret into the deployment logs. Errors now list variable names and the requirement, without anything derived from a secret (not even its length), and `repr()` of the settings hides both secrets.
 - **Algorithm allow-list:** the app signs with a shared secret, so `none` or an asymmetric algorithm (RS256) can only be a misconfiguration. It's rejected everywhere.
-- **Warnings outside production** keep existing local setups and tests running while still pointing out what production would refuse.
+- **Warnings outside production** keep existing local setups and tests running while still pointing out what production would refuse. They log only variable names: CodeQL flags log lines fed by anything named like a secret (even a constant such as the generation command), and names are all a developer needs to find the problem.
 
 **Trade-off**
 
