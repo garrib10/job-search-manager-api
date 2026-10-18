@@ -70,7 +70,7 @@ def create_interview(
     interview_type="technical",
     status="scheduled",
     outcome="pending",
-    scheduled_at="2026-09-15T10:00:00",
+    scheduled_at="2026-09-15T10:00:00Z",
 ):
     """
     Create an interview for workflow testing.
@@ -108,7 +108,7 @@ def test_complete_job_search_workflow(client):
     interview = create_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-20T14:00:00",
+        scheduled_at="2026-09-20T14:00:00Z",
     )
 
     application_update = client.put(
@@ -137,7 +137,7 @@ def test_complete_job_search_workflow(client):
             "interview_type": "technical",
             "status": "completed",
             "outcome": "advanced",
-            "scheduled_at": "2026-09-20T14:00:00",
+            "scheduled_at": "2026-09-20T14:00:00Z",
             "interviewer": "Jordan Lee",
             "location": "Zoom",
             "notes": "Technical interview completed.",
@@ -242,7 +242,7 @@ def test_interview_progression_workflow(client):
         client,
         application["id"],
         interview_type="behavioral",
-        scheduled_at="2026-09-22T11:00:00",
+        scheduled_at="2026-09-22T11:00:00Z",
     )
 
     assert interview["status"] == "scheduled"
@@ -255,7 +255,7 @@ def test_interview_progression_workflow(client):
             "interview_type": "behavioral",
             "status": "completed",
             "outcome": "advanced",
-            "scheduled_at": "2026-09-22T11:00:00",
+            "scheduled_at": "2026-09-22T11:00:00Z",
             "interviewer": "Taylor Smith",
             "location": "Zoom",
             "notes": "Behavioral interview completed.",
@@ -449,7 +449,7 @@ def test_database_relationship_integrity_workflow(client):
     interview = create_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-25T13:00:00",
+        scheduled_at="2026-09-25T13:00:00Z",
     )
 
     company_response = client.get(
@@ -498,7 +498,7 @@ def test_invalid_relationship_workflow(client):
             "interview_type": "technical",
             "status": "scheduled",
             "outcome": "pending",
-            "scheduled_at": "2026-09-30T10:00:00",
+            "scheduled_at": "2026-09-30T10:00:00Z",
             "interviewer": "Jordan Lee",
             "location": "Zoom",
             "notes": "Should not be created.",

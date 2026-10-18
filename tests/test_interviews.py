@@ -54,7 +54,7 @@ def create_test_interview(
     interview_type="technical",
     status="scheduled",
     outcome="pending",
-    scheduled_at="2026-09-10T10:00:00",
+    scheduled_at="2026-09-10T10:00:00Z",
 ):
     response = client.post(
         "/interviews",
@@ -90,7 +90,7 @@ def test_create_interview(client):
             "interview_type": "technical",
             "status": "scheduled",
             "outcome": "pending",
-            "scheduled_at": "2026-09-15T14:00:00",
+            "scheduled_at": "2026-09-15T14:00:00Z",
             "interviewer": "Alex Smith",
             "location": "Zoom",
             "notes": "Technical interview.",
@@ -119,14 +119,14 @@ def test_list_interviews(client):
         client,
         application["id"],
         interview_type="technical",
-        scheduled_at="2026-09-10T10:00:00",
+        scheduled_at="2026-09-10T10:00:00Z",
     )
 
     create_test_interview(
         client,
         application["id"],
         interview_type="behavioral",
-        scheduled_at="2026-09-11T10:00:00",
+        scheduled_at="2026-09-11T10:00:00Z",
     )
 
     response = client.get("/interviews")
@@ -170,7 +170,7 @@ def test_update_interview(client):
     interview = create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-10T10:00:00",
+        scheduled_at="2026-09-10T10:00:00Z",
     )
 
     response = client.put(
@@ -180,7 +180,7 @@ def test_update_interview(client):
             "interview_type": "technical",
             "status": "completed",
             "outcome": "advanced",
-            "scheduled_at": "2026-09-10T10:00:00",
+            "scheduled_at": "2026-09-10T10:00:00Z",
             "interviewer": "Jordan Lee",
             "location": "Zoom",
             "notes": "Interview completed successfully.",
@@ -231,7 +231,7 @@ def test_create_interview_with_invalid_application(client):
             "interview_type": "technical",
             "status": "scheduled",
             "outcome": "pending",
-            "scheduled_at": "2026-09-12T10:00:00",
+            "scheduled_at": "2026-09-12T10:00:00Z",
             "interviewer": "Jordan Lee",
             "location": "Zoom",
             "notes": "Invalid relationship test.",
@@ -251,7 +251,7 @@ def test_duplicate_interview_schedule(client):
         company["id"],
     )
 
-    scheduled_at = "2026-09-20T09:30:00"
+    scheduled_at = "2026-09-20T09:30:00Z"
 
     create_test_interview(
         client,
@@ -309,13 +309,13 @@ def test_filter_interviews_by_application(client):
     create_test_interview(
         client,
         application_one["id"],
-        scheduled_at="2026-09-01T09:00:00",
+        scheduled_at="2026-09-01T09:00:00Z",
     )
 
     create_test_interview(
         client,
         application_two["id"],
-        scheduled_at="2026-09-02T09:00:00",
+        scheduled_at="2026-09-02T09:00:00Z",
     )
 
     response = client.get(
@@ -341,7 +341,7 @@ def test_filter_interviews_by_status(client):
         client,
         application["id"],
         status="scheduled",
-        scheduled_at="2026-09-03T09:00:00",
+        scheduled_at="2026-09-03T09:00:00Z",
     )
 
     create_test_interview(
@@ -349,7 +349,7 @@ def test_filter_interviews_by_status(client):
         application["id"],
         status="completed",
         outcome="advanced",
-        scheduled_at="2026-09-04T09:00:00",
+        scheduled_at="2026-09-04T09:00:00Z",
     )
 
     response = client.get(
@@ -375,14 +375,14 @@ def test_filter_interviews_by_type(client):
         client,
         application["id"],
         interview_type="technical",
-        scheduled_at="2026-09-05T09:00:00",
+        scheduled_at="2026-09-05T09:00:00Z",
     )
 
     create_test_interview(
         client,
         application["id"],
         interview_type="behavioral",
-        scheduled_at="2026-09-06T09:00:00",
+        scheduled_at="2026-09-06T09:00:00Z",
     )
 
     response = client.get(
@@ -408,7 +408,7 @@ def test_filter_interviews_by_outcome(client):
         client,
         application["id"],
         outcome="pending",
-        scheduled_at="2026-09-07T09:00:00",
+        scheduled_at="2026-09-07T09:00:00Z",
     )
 
     create_test_interview(
@@ -416,7 +416,7 @@ def test_filter_interviews_by_outcome(client):
         application["id"],
         status="completed",
         outcome="advanced",
-        scheduled_at="2026-09-08T09:00:00",
+        scheduled_at="2026-09-08T09:00:00Z",
     )
 
     response = client.get(
@@ -441,13 +441,13 @@ def test_sort_interviews_descending(client):
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-01T09:00:00",
+        scheduled_at="2026-09-01T09:00:00Z",
     )
 
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-10T09:00:00",
+        scheduled_at="2026-09-10T09:00:00Z",
     )
 
     response = client.get(
@@ -474,13 +474,13 @@ def test_interview_pagination(client):
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-01T09:00:00",
+        scheduled_at="2026-09-01T09:00:00Z",
     )
 
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-02T09:00:00",
+        scheduled_at="2026-09-02T09:00:00Z",
     )
 
     first_response = client.get(
@@ -505,8 +505,8 @@ def test_interview_pagination(client):
 def test_invalid_interview_date_range(client):
     response = client.get(
         "/interviews"
-        "?scheduled_from=2026-09-30T23:59:59"
-        "&scheduled_to=2026-09-01T00:00:00"
+        "?scheduled_from=2026-09-30T23:59:59Z"
+        "&scheduled_to=2026-09-01T00:00:00Z"
     )
 
     assert response.status_code == 400
@@ -532,7 +532,7 @@ def test_create_interview_with_invalid_type(client):
             "interview_type": "coding_round",
             "status": "scheduled",
             "outcome": "pending",
-            "scheduled_at": "2026-09-15T10:00:00",
+            "scheduled_at": "2026-09-15T10:00:00Z",
             "interviewer": "Jordan Lee",
             "location": "Zoom",
             "notes": "Should fail validation.",
@@ -552,13 +552,13 @@ def test_update_interview_with_duplicate_schedule(client):
     first_interview = create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-20T09:00:00",
+        scheduled_at="2026-09-20T09:00:00Z",
     )
 
     second_interview = create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-21T09:00:00",
+        scheduled_at="2026-09-21T09:00:00Z",
     )
 
     response = client.put(
@@ -594,7 +594,7 @@ def test_update_interview_with_invalid_application(client):
     interview = create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-25T10:00:00",
+        scheduled_at="2026-09-25T10:00:00Z",
     )
 
     response = client.put(
@@ -604,7 +604,7 @@ def test_update_interview_with_invalid_application(client):
             "interview_type": "technical",
             "status": "scheduled",
             "outcome": "pending",
-            "scheduled_at": "2026-09-25T10:00:00",
+            "scheduled_at": "2026-09-25T10:00:00Z",
             "interviewer": "Jordan Lee",
             "location": "Zoom",
             "notes": "Invalid application update test.",
@@ -627,17 +627,17 @@ def test_filter_interviews_by_scheduled_from(client):
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-01T09:00:00",
+        scheduled_at="2026-09-01T09:00:00Z",
     )
 
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-10T09:00:00",
+        scheduled_at="2026-09-10T09:00:00Z",
     )
 
     response = client.get(
-        "/interviews?scheduled_from=2026-09-05T00:00:00"
+        "/interviews?scheduled_from=2026-09-05T00:00:00Z"
     )
 
     assert response.status_code == 200
@@ -658,17 +658,17 @@ def test_filter_interviews_by_scheduled_to(client):
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-01T09:00:00",
+        scheduled_at="2026-09-01T09:00:00Z",
     )
 
     create_test_interview(
         client,
         application["id"],
-        scheduled_at="2026-09-10T09:00:00",
+        scheduled_at="2026-09-10T09:00:00Z",
     )
 
     response = client.get(
-        "/interviews?scheduled_to=2026-09-05T23:59:59"
+        "/interviews?scheduled_to=2026-09-05T23:59:59Z"
     )
 
     assert response.status_code == 200

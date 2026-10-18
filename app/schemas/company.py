@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from app.schemas.types import NotesText, RequiredText
 
 
 class CompanyBase(BaseModel):
@@ -11,9 +12,7 @@ class CompanyBase(BaseModel):
     validation rules across create and response models.
     """
 
-    name: str = Field(
-        min_length=1,
-        max_length=150,
+    name: RequiredText(150) = Field(
         examples=["Travelers"],
     )
 
@@ -29,7 +28,7 @@ class CompanyBase(BaseModel):
         max_length=150,
     )
 
-    notes: str | None = None
+    notes: NotesText | None = None
 
 
 class CompanyCreate(CompanyBase):
@@ -47,10 +46,7 @@ class CompanyUpdate(BaseModel):
     fields such as id and timestamps are never accepted from the client.
     """
 
-    name: str = Field(
-        min_length=1,
-        max_length=150,
-    )
+    name: RequiredText(150)
 
     website: HttpUrl | None = None
 
@@ -64,7 +60,7 @@ class CompanyUpdate(BaseModel):
         max_length=150,
     )
 
-    notes: str | None = None
+    notes: NotesText | None = None
 
 
 class CompanyResponse(CompanyBase):
@@ -75,6 +71,12 @@ class CompanyResponse(CompanyBase):
     Response schemas expose generated database fields while keeping the
     persistence model separate from the public API contract.
     """
+
+    # WHY:
+    # Responses use plain types so records saved before the stricter input
+    # rules (for example, a blank name) can still be read.
+    name: str
+    notes: str | None = None
 
     id: int
     created_at: datetime

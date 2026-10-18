@@ -33,7 +33,7 @@ def create_application(client, headers, company_id, url="https://example.com/job
     return response
 
 
-def create_interview(client, headers, application_id, when="2026-11-02T15:00:00"):
+def create_interview(client, headers, application_id, when="2026-11-02T15:00:00Z"):
     return client.post(
         "/interviews",
         json={"application_id": application_id, "interview_type": "technical", "scheduled_at": when},
@@ -73,7 +73,7 @@ def test_deleting_application_deletes_its_interviews(client, auth_headers, db_se
     application = create_application(client, auth_headers, company["id"]).json()
     other = create_application(client, auth_headers, company["id"], url="https://example.com/jobs/2").json()
     first = create_interview(client, auth_headers, application["id"])
-    second = create_interview(client, auth_headers, application["id"], when="2026-11-03T15:00:00")
+    second = create_interview(client, auth_headers, application["id"], when="2026-11-03T15:00:00Z")
     kept = create_interview(client, auth_headers, other["id"])
 
     response = client.delete(f"/applications/{application['id']}", headers=auth_headers)

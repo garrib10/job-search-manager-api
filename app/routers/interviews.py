@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Annotated, Literal
 from fastapi import (
     APIRouter,
@@ -20,6 +19,7 @@ from app.schemas import (
     InterviewUpdate,
 )
 from app.routers.auth import CurrentUser, get_current_user
+from app.schemas.types import UtcDatetime
 from app.services import interview_service
 
 
@@ -72,8 +72,8 @@ def get_interviews(
     interview_type: InterviewType | None = None,
     status_filter: InterviewStatus | None = None,
     outcome: InterviewOutcome | None = None,
-    scheduled_from: datetime | None = None,
-    scheduled_to: datetime | None = None,
+    scheduled_from: UtcDatetime | None = None,
+    scheduled_to: UtcDatetime | None = None,
     sort_order: Literal["asc", "desc"] = "asc",
     limit: int = Query(
         default=20,

@@ -36,7 +36,7 @@ def user_a_records(client, auth_headers):
         json={
             "application_id": application["id"],
             "interview_type": "technical",
-            "scheduled_at": "2026-11-02T15:00:00",
+            "scheduled_at": "2026-11-02T15:00:00Z",
         },
         headers=auth_headers,
     ).json()
@@ -62,7 +62,7 @@ def user_b_records(client, other_auth_headers):
         json={
             "application_id": application["id"],
             "interview_type": "hr",
-            "scheduled_at": "2026-11-03T15:00:00",
+            "scheduled_at": "2026-11-03T15:00:00Z",
         },
         headers=other_auth_headers,
     ).json()
@@ -137,7 +137,7 @@ def test_cannot_update_another_users_records(client, auth_headers, other_auth_he
             {
                 "application_id": user_b_records["application"]["id"],
                 "interview_type": "final",
-                "scheduled_at": "2026-12-01T09:00:00",
+                "scheduled_at": "2026-12-01T09:00:00Z",
             },
         ),
     ]
@@ -181,7 +181,7 @@ def test_cannot_create_interview_under_another_users_application(client, other_a
         json={
             "application_id": user_a_records["application"]["id"],
             "interview_type": "technical",
-            "scheduled_at": "2026-11-05T15:00:00",
+            "scheduled_at": "2026-11-05T15:00:00Z",
         },
         headers=other_auth_headers,
     )

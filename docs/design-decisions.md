@@ -14,6 +14,7 @@ Each entry records a question about how the project works, the decision made, wh
 8. [How are records owned, and how do existing records get an owner?](#how-are-records-owned-and-how-do-existing-records-get-an-owner)
 9. [How is each user's data kept separate?](#how-is-each-users-data-kept-separate)
 10. [What happens on delete, duplicates, and database conflicts?](#what-happens-on-delete-duplicates-and-database-conflicts)
+11. [How are dates, times, and text inputs validated?](#how-are-dates-times-and-text-inputs-validated)
 
 ---
 
@@ -308,4 +309,47 @@ Every endpoint on those routers now requires a valid bearer token. Requests with
 - The generic 409 doesn't say which value conflicted; the friendlier messages come from the service checks, which cover normal use.
 - **Downgrading `9e9a352c0176`** restores the global URL key, and stops without changing anything if two users already share a URL.
 - Until `9e9a352c0176` runs in production, the deployed per-user check and the old global key can disagree. Those requests get the generic 409 (see `docs/database-migrations.md`).
+
+---
+
+## How are dates, times, and text inputs validated?
+
+**Decision**
+
+- **Datetime input must include a UTC offset** (`Z`, `+00:00`, `-05:00`, and so on). That applies to `scheduled_at` and the `scheduled_from`/`scheduled_to` filters. A datetime without an offset is rejected with `422` ("Input should have timezone info"). Accepted values are converted to UTC.
+- **Storage and output are UTC:**
+  - Every datetime column uses `UTCDateTime`, a SQLAlchemy type over MySQL `DATETIME`. It converts offset-aware values to UTC before storing them and marks every value it reads as UTC.
+  - Responses therefore always carry an explicit offset (`2026-11-01T15:00:00Z`).
+  - Each MySQL connection sets `time_zone = '+00:00'`, so `NOW()` defaults (`created_at`, `updated_at`) are UTC regardless of the server's configuration.
+- **Required text** (`Company.name`, `JobApplication.job_title`) has surrounding whitespace removed, and a value that's empty afterwards is rejected.
+- **Notes fields** are limited to 65,535 bytes **of UTF-8**, which is MySQL `TEXT`'s capacity, rather than to a character count.
+- **`GET /companies`** takes `limit` (1–100, default 20) and `offset` (≥ 0), ordered by name and then ID.
+- **Login** no longer checks password length. A short password is just a wrong password and gets the same `401` as any failed login. The 8-character minimum stays at registration.
+
+**Existing stored values**
+
+Values stored before this change are **not converted**. Their original timezone isn't known and can't be recovered:
+
+- Interview times were stored as the wall-clock time the client sent, with any offset dropped.
+- `created_at` and `updated_at` came from `NOW()` in the MySQL server's own timezone at the time.
+
+They are now **returned labelled as UTC**. That's correct only if the original input or the server was already UTC, and nothing here changes or relabels production data. Correcting old records would need someone who knows what zone they were entered in.
+
+The new rules apply only to **requests**. Response models accept what's already stored, so a record saved earlier with a blank name or other legacy value can still be read.
+
+**Why**
+
+- **Reject naive datetimes rather than guess.** Assuming UTC (or any zone) for a value without an offset silently stores the wrong instant whenever the guess is wrong, which is exactly the bug the audit found (10:00-05:00 stored as 10:00). Requiring the offset makes the client state what it means.
+- **Normalize in the column type** as well as in request validation, so code that writes datetimes without going through the API (scripts, tests, future services) is converted the same way. A test writes a `-05:00` value straight through the ORM to prove it.
+- **Bytes, not characters, for notes:** a 16,384-character note made of emoji is 65,536 bytes and wouldn't fit in `TEXT`. A character limit would either reject long plain-text notes unnecessarily or let multi-byte notes overflow into a database error.
+- **Strip required text:** a name of only spaces looks empty everywhere it's shown. Stripping also stops near-duplicates like `"Acme"` and `"Acme "`.
+- **Paginate companies** for consistency with applications and interviews, and so the list stays bounded. The ID tie-breaker keeps page boundaries stable when names repeat.
+- **No length check at login:** returning `422` for a short password tells a caller something about the password rules instead of simply saying the login failed.
+
+**Trade-off**
+
+- **Clients must send offsets.** A request that used to send `2026-11-01T15:00:00` now gets 422 until it adds `Z` or an offset.
+- **`GET /companies` now returns at most 20 companies by default.** Clients with more must page with `limit`/`offset`, as they already do for applications and interviews.
+- **Old timestamps are labelled UTC without proof.** This is documented rather than "fixed", because fixing it would mean guessing.
+- The byte limit is checked after the request body is parsed, so a very large note is still read into memory before being rejected; a request-size limit at the server or proxy is the place to cap that.
 

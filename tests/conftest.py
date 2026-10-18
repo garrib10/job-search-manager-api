@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from app.config import get_settings
-from app.database import Base, get_db
+from app.database import CONNECT_ARGS, Base, get_db
 from app.main import app
 from app.models import Company, Interview, JobApplication, User
 from app.schemas import UserCreate
@@ -33,6 +33,7 @@ APP_DATABASE_NAME = get_settings().db_name
 # The check uses the URL of the engine the fixtures actually use.
 test_engine = create_engine(
     TEST_DATABASE_URL,
+    connect_args=CONNECT_ARGS,
 )
 
 assert_safe_test_database(test_engine.url, APP_DATABASE_NAME)

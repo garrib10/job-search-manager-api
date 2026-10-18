@@ -5,6 +5,7 @@ from app.enums import (
     InterviewStatus,
     InterviewType,
 )
+from app.schemas.types import NotesText, UtcDatetime
 
 
 class InterviewBase(BaseModel):
@@ -20,7 +21,7 @@ class InterviewBase(BaseModel):
 
     outcome: InterviewOutcome = InterviewOutcome.PENDING
 
-    scheduled_at: datetime
+    scheduled_at: UtcDatetime
 
     interviewer: str | None = Field(
         default=None,
@@ -32,7 +33,7 @@ class InterviewBase(BaseModel):
         max_length=150,
     )
 
-    notes: str | None = None
+    notes: NotesText | None = None
 
 
 class InterviewCreate(InterviewBase):
@@ -49,6 +50,12 @@ class InterviewUpdate(InterviewBase):
 
 class InterviewResponse(InterviewBase):
     """Public interview representation returned by the API."""
+
+    # WHY:
+    # Responses use plain types so records saved before the stricter input
+    # rules can still be read. Stored values come back marked as UTC.
+    scheduled_at: datetime
+    notes: str | None = None
 
     id: int
     created_at: datetime
