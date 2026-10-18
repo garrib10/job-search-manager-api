@@ -103,17 +103,17 @@ def find_unsafe_settings(settings: Settings) -> list[str]:
     """
     Describe every setting that would be unsafe in production.
 
-    Each message names the environment variable and what to change, using
-    lengths rather than values.
+    Each message names the environment variable and what to change. Nothing
+    derived from a secret (not even its length) is included, because these
+    messages are logged.
     """
     problems = []
-    secret_bytes = len(settings.jwt_secret_key.encode("utf-8"))
     required_bytes = MIN_JWT_SECRET_BYTES[settings.jwt_algorithm]
 
-    if secret_bytes < required_bytes:
+    if len(settings.jwt_secret_key.encode("utf-8")) < required_bytes:
         problems.append(
-            f"JWT_SECRET_KEY is {secret_bytes} bytes; {settings.jwt_algorithm} needs at least "
-            f"{required_bytes}. Generate one with: {GENERATE_SECRET_HINT}"
+            f"JWT_SECRET_KEY is shorter than the {required_bytes} bytes {settings.jwt_algorithm} requires. "
+            f"Generate one with: {GENERATE_SECRET_HINT}"
         )
 
     if settings.jwt_secret_key in KNOWN_PLACEHOLDER_SECRETS:

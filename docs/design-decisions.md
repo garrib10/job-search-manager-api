@@ -436,7 +436,7 @@ In development, test, and CI, the production checks only log a warning.
 
 - **The signing secret protects every login.** Anyone who can guess or brute-force it can mint a token for any user. RFC 7518 requires an HMAC key at least as long as the hash output, which is where the 32/48/64-byte minimums come from. They're measured in bytes because that's what HMAC uses.
 - **Failing at startup is the safest moment.** `get_settings()` runs when the app, Alembic, and the scripts import their settings, so a bad production configuration stops Railway's pre-deploy migration and the new version never takes traffic. The previous version keeps running.
-- **Secrets stay out of logs.** Pydantic's validation errors include the submitted input, so a missing `DB_HOST` would have printed the password and signing secret into the deployment logs. Errors now list variable names and the problem (with lengths, not values), and `repr()` of the settings hides both secrets.
+- **Secrets stay out of logs.** Pydantic's validation errors include the submitted input, so a missing `DB_HOST` would have printed the password and signing secret into the deployment logs. Errors now list variable names and the requirement, without anything derived from a secret (not even its length), and `repr()` of the settings hides both secrets.
 - **Algorithm allow-list:** the app signs with a shared secret, so `none` or an asymmetric algorithm (RS256) can only be a misconfiguration. It's rejected everywhere.
 - **Warnings outside production** keep existing local setups and tests running while still pointing out what production would refuse.
 

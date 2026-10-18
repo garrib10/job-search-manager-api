@@ -56,7 +56,8 @@ def test_production_rejects_a_short_secret(app_env):
         check_settings(make_settings(app_env=app_env, jwt_secret_key=WEAK_SECRET))
 
     message = str(error.value)
-    assert "JWT_SECRET_KEY is 21 bytes; HS256 needs at least 32" in message
+    assert "JWT_SECRET_KEY is shorter than the 32 bytes HS256 requires" in message
+    assert "21" not in message  # nothing derived from the secret, not even its length
     assert "secrets.token_urlsafe" in message
     assert WEAK_SECRET not in message
 
@@ -65,7 +66,7 @@ def test_production_rejects_a_short_secret(app_env):
 def test_minimum_secret_length_follows_the_algorithm(algorithm, required):
     check_settings(make_settings(jwt_algorithm=algorithm, jwt_secret_key="k" * required))
 
-    with pytest.raises(SettingsError, match=f"needs at least {required}"):
+    with pytest.raises(SettingsError, match=f"shorter than the {required} bytes {algorithm} requires"):
         check_settings(make_settings(jwt_algorithm=algorithm, jwt_secret_key="k" * (required - 1)))
 
 
