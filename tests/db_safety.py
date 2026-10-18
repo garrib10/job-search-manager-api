@@ -67,3 +67,18 @@ def drop_test_schema(engine: Engine, metadata: MetaData, app_database_name: str)
     assert_safe_test_database(engine.url, app_database_name)
 
     metadata.drop_all(bind=engine)
+
+
+def drop_all_tables(engine: Engine, app_database_name: str) -> None:
+    """
+    Drop every table in the test database, including ones not in the models
+    (such as alembic_version), but only after the safety checks pass.
+
+    WHY:
+    Migration tests need a truly empty database to run Alembic from scratch.
+    """
+    assert_safe_test_database(engine.url, app_database_name)
+
+    existing = MetaData()
+    existing.reflect(bind=engine)
+    existing.drop_all(bind=engine)

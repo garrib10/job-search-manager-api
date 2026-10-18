@@ -18,6 +18,7 @@ from app.enums import ApplicationStatus, WorkArrangement
 if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.interview import Interview
+    from app.models.user import User
 
 
 class JobApplication(Base):
@@ -120,6 +121,20 @@ class JobApplication(Base):
     )
 
     company: Mapped["Company"] = relationship(
+        back_populates="applications",
+    )
+
+    # WHY:
+    # Applications store their owner directly so they can be filtered by user
+    # without joining through Company. Interviews inherit ownership through
+    # their application and have no user_id of their own.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", name="fk_job_applications_user_id_users"),
+        nullable=False,
+        index=True,
+    )
+
+    user: Mapped["User"] = relationship(
         back_populates="applications",
     )
 
