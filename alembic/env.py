@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, pool
 from alembic import context
 from app.config import get_settings
 from app.database import Base
+from app.db_types import UTCDateTime
 
 # WHY:
 # Importing app.models registers every table with Base.metadata so autogenerate
@@ -27,6 +28,21 @@ target_metadata = Base.metadata
 database_url = get_settings().database_url
 
 
+def render_item(type_, obj, autogen_context):
+    """
+    Render UTCDateTime columns as plain sa.DateTime() in generated migrations.
+
+    WHY:
+    UTCDateTime only changes how Python converts values; the database column
+    is an ordinary DATETIME. Rendering it as sa.DateTime() keeps migration
+    files free of application imports.
+    """
+    if type_ == "type" and isinstance(obj, UTCDateTime):
+        return "sa.DateTime()"
+
+    return False
+
+
 def run_migrations_offline() -> None:
     """Emit migration SQL to stdout without connecting (`alembic upgrade head --sql`)."""
     context.configure(
@@ -35,6 +51,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        render_item=render_item,
     )
 
     with context.begin_transaction():
@@ -52,6 +69,7 @@ def run_with_connection(connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,
         transaction_per_migration=True,
+        render_item=render_item,
     )
 
     with context.begin_transaction():

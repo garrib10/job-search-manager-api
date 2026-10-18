@@ -9,6 +9,7 @@ from pydantic import (
 )
 
 from app.enums import ApplicationStatus, WorkArrangement
+from app.schemas.types import NotesText, RequiredText
 
 
 class JobApplicationBase(BaseModel):
@@ -20,9 +21,7 @@ class JobApplicationBase(BaseModel):
     schemas remain consistent.
     """
 
-    job_title: str = Field(
-        min_length=1,
-        max_length=200,
+    job_title: RequiredText(200) = Field(
         examples=["Associate Software Engineer"],
     )
 
@@ -53,7 +52,7 @@ class JobApplicationBase(BaseModel):
 
     status: ApplicationStatus = ApplicationStatus.SAVED
 
-    notes: str | None = None
+    notes: NotesText | None = None
 
     date_applied: date | None = None
 
@@ -88,6 +87,12 @@ class JobApplicationUpdate(JobApplicationBase):
 
 class JobApplicationResponse(JobApplicationBase):
     """Public job application representation returned by the API."""
+
+    # WHY:
+    # Responses use plain types so records saved before the stricter input
+    # rules can still be read.
+    job_title: str
+    notes: str | None = None
 
     id: int
     date_saved: date

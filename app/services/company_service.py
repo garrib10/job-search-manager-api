@@ -38,13 +38,17 @@ def get_companies(
     db: Session,
     *,
     user_id: int,
+    limit: int = 20,
+    offset: int = 0,
 ) -> list[Company]:
-    """Return the user's companies ordered alphabetically by name."""
+    """Return a page of the user's companies ordered by name, then ID."""
 
     statement = (
         select(Company)
         .where(Company.user_id == user_id)
-        .order_by(Company.name)
+        .order_by(Company.name, Company.id)
+        .limit(limit)
+        .offset(offset)
     )
 
     return list(db.scalars(statement).all())

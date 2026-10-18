@@ -3,7 +3,6 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from sqlalchemy import (
     Date,
-    DateTime,
     Enum,
     ForeignKey,
     Numeric,
@@ -14,6 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+from app.db_types import UTCDateTime
 from app.enums import ApplicationStatus, WorkArrangement
 
 if TYPE_CHECKING:
@@ -113,13 +113,13 @@ class JobApplication(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        UTCDateTime,
         nullable=False,
         server_default=func.now(),
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        UTCDateTime,
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),

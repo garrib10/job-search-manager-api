@@ -8,11 +8,21 @@ from app.config import get_settings
 
 settings = get_settings()
 
+# WHY:
+# Every connection uses UTC as its session time zone, so server-side
+# defaults such as NOW() (created_at, updated_at) produce UTC no matter how
+# the MySQL server's own time zone is configured. DATETIME values already
+# stored are not converted.
+CONNECT_ARGS = {
+    "init_command": "SET time_zone = '+00:00'",
+}
+
 
 engine = create_engine(
     settings.database_url,
     echo=False,
     pool_pre_ping=True,
+    connect_args=CONNECT_ARGS,
 )
 
 

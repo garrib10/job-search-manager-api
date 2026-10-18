@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas import CompanyCreate, CompanyResponse, CompanyUpdate
@@ -54,12 +54,28 @@ def create_company(
 def get_companies(
     db: DatabaseSession,
     current_user: CurrentUser,
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+    ),
+    offset: int = Query(
+        default=0,
+        ge=0,
+    ),
 ) -> list[CompanyResponse]:
-    """Return the authenticated user's companies."""
+    """
+    Return the authenticated user's companies, ordered by name and then ID.
 
+    WHY:
+    Results are paginated like applications and interviews, and the ID
+    tie-breaker keeps the order stable when names repeat.
+    """
     return company_service.get_companies(
         db,
         user_id=current_user.id,
+        limit=limit,
+        offset=offset,
     )
 
 

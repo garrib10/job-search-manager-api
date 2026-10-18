@@ -34,8 +34,11 @@ class UserLogin(BaseModel):
 
     email: EmailStr
 
+    # WHY:
+    # No minimum length here: a short password is simply a wrong password
+    # and gets the same 401 as any other failed login. The minimum applies
+    # at registration (UserCreate).
     password: str = Field(
-        min_length=8,
         max_length=128,
     )
 
