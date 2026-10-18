@@ -10,8 +10,10 @@ router = APIRouter(
     prefix="/companies",
     tags=["Companies"],
     # WHY:
-    # Every endpoint in this router requires a valid bearer token.
-    # Records are not yet scoped to the logged-in user (planned for v0.2.0).
+    # Every endpoint in this router requires a valid bearer token. Each
+    # endpoint also takes CurrentUser so the service can scope records to
+    # the logged-in user; this router-level dependency keeps any new
+    # endpoint protected by default.
     dependencies=[Depends(get_current_user)],
 )
 
@@ -51,10 +53,14 @@ def create_company(
 )
 def get_companies(
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> list[CompanyResponse]:
-    """Return all companies."""
+    """Return the authenticated user's companies."""
 
-    return company_service.get_companies(db)
+    return company_service.get_companies(
+        db,
+        user_id=current_user.id,
+    )
 
 
 @router.get(
@@ -65,6 +71,7 @@ def get_companies(
 def get_company(
     company_id: int,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> CompanyResponse:
     """
     Return one company by ID.
@@ -77,6 +84,7 @@ def get_company(
     return company_service.require_company_by_id(
         db,
         company_id,
+        user_id=current_user.id,
     )
 
 
@@ -89,12 +97,14 @@ def update_company(
     company_id: int,
     company_data: CompanyUpdate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> CompanyResponse:
     """Update an existing company."""
 
     company = company_service.require_company_by_id(
         db,
         company_id,
+        user_id=current_user.id,
     )
 
     return company_service.update_company(
@@ -112,12 +122,14 @@ def update_company(
 def delete_company(
     company_id: int,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> Response:
     """Delete an existing company."""
 
     company = company_service.require_company_by_id(
         db,
         company_id,
+        user_id=current_user.id,
     )
 
     company_service.delete_company(

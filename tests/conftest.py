@@ -125,32 +125,48 @@ def client(
 
 
 TEST_USER_EMAIL = "resource-user@example.com"
+OTHER_USER_EMAIL = "other-user@example.com"
 TEST_USER_PASSWORD = "TestPassword123!"
+
+
+def create_user_headers(
+    db_session: Session,
+    email: str,
+) -> dict[str, str]:
+    """
+    Register a user and return a valid bearer token header for them.
+
+    WHY:
+    The user is created through the same service and token function the
+    API uses, so tests exercise the real authentication path.
+    """
+    auth_service.register_user(
+        db_session,
+        UserCreate(
+            email=email,
+            password=TEST_USER_PASSWORD,
+        ),
+    )
+
+    token = create_access_token(email)
+
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def auth_headers(
     db_session: Session,
 ) -> dict[str, str]:
-    """
-    Create a test user and return a valid bearer token header for it.
+    """Bearer token header for the main test user ("user A")."""
+    return create_user_headers(db_session, TEST_USER_EMAIL)
 
-    WHY:
-    Company, application, and interview endpoints require login. The user
-    is created through the same service and token function the API uses,
-    so tests exercise the real authentication path.
-    """
-    auth_service.register_user(
-        db_session,
-        UserCreate(
-            email=TEST_USER_EMAIL,
-            password=TEST_USER_PASSWORD,
-        ),
-    )
 
-    token = create_access_token(TEST_USER_EMAIL)
-
-    return {"Authorization": f"Bearer {token}"}
+@pytest.fixture
+def other_auth_headers(
+    db_session: Session,
+) -> dict[str, str]:
+    """Bearer token header for a second, unrelated user ("user B")."""
+    return create_user_headers(db_session, OTHER_USER_EMAIL)
 
 
 @pytest.fixture

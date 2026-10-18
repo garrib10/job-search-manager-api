@@ -12,6 +12,7 @@ Each entry records a question about how the project works, the decision made, wh
 6. [How should security vulnerabilities be reported?](#how-should-security-vulnerabilities-be-reported)
 7. [How is the database schema created and changed?](#how-is-the-database-schema-created-and-changed)
 8. [How are records owned, and how do existing records get an owner?](#how-are-records-owned-and-how-do-existing-records-get-an-owner)
+9. [How is each user's data kept separate?](#how-is-each-users-data-kept-separate)
 
 ---
 
@@ -246,4 +247,32 @@ Every endpoint on those routers now requires a valid bearer token. Requests with
 - `owner_email` assigns all unowned rows to one account. Splitting existing data between accounts requires manual SQL between the stages.
 - **Undoing stage 1 permanently discards owner assignments,** although it keeps the records themselves.
 - Production needs a manual, ordered procedure: back up, stamp, stage 1, deploy, stage 2, verify. It stays manual until deploy-time migrations arrive in v0.3.0.
+
+---
+
+## How is each user's data kept separate?
+
+**Decision**
+
+- Every service function that reads or changes companies, applications, or interviews takes a keyword-only `user_id`. Each endpoint passes `current_user.id`.
+- **Single-record lookups** (`require_company_by_id`, `require_application_by_id`, `require_interview_by_id`) filter by ID **and** owner in one query.
+- **Lists, filters, search, sorting, and pagination** all start from the user's own records.
+- **Interviews** are scoped by joining to their application (`JobApplication.user_id`), since they have no owner column of their own.
+- **Referenced parents are checked too:** creating or updating an application requires the `company_id` to belong to the user, and creating or updating an interview requires the `application_id` to belong to the user. These checks reuse the same owner-scoped lookups.
+- Another user's record returns **404 with the same body as a missing ID** ("Company not found", and so on), not 403.
+- Unscoped lookup helpers that bypassed ownership (`db.get` by primary key) were removed. Every remaining lookup is owner-scoped.
+
+**Why**
+
+- **One rule, applied at the data layer.** Scoping inside the queries, rather than loading a record and checking its owner afterwards in each route, means a route can't forget the check; an unscoped lookup simply doesn't exist to call.
+- **404 instead of 403:** a 403 would confirm that the ID exists and belongs to someone else, letting a user enumerate other users' records. Treating "not yours" and "doesn't exist" identically reveals nothing.
+- **Checking referenced parents** stops a user from attaching their records to someone else's company or application. That would leak the parent's existence, and would mix two users' data under one company.
+- **Validation before changes:** ownership checks run before any field is modified, so a rejected create or update writes nothing.
+- **Tests guard every path:** `tests/test_isolation.py` has user B try to read, list, filter, search, update, delete, and re-parent user A's records. Removing scoping from a single query fails these tests.
+
+**Trade-off**
+
+- The duplicate-`job_url` check is still global, because the database constraint is global; changing it to per-user is #21. Until then, a user who adds a URL another user already tracks gets a 409.
+- Every service call now needs a `user_id`. That's more parameters, but it keeps the scoping explicit and impossible to skip.
+- Interview queries add a join to `job_applications`; the join uses the existing indexed foreign key.
 

@@ -23,8 +23,10 @@ router = APIRouter(
     prefix="/applications",
     tags=["Applications"],
     # WHY:
-    # Every endpoint in this router requires a valid bearer token.
-    # Records are not yet scoped to the logged-in user (planned for v0.2.0).
+    # Every endpoint in this router requires a valid bearer token. Each
+    # endpoint also takes CurrentUser so the service can scope records to
+    # the logged-in user; this router-level dependency keeps any new
+    # endpoint protected by default.
     dependencies=[Depends(get_current_user)],
 )
 
@@ -65,6 +67,7 @@ def create_application(
 )
 def get_applications(
     db: DatabaseSession,
+    current_user: CurrentUser,
     status_filter: ApplicationStatus | None = None,
     company_id: int | None = None,
     company: str | None = None,
@@ -98,6 +101,7 @@ def get_applications(
     """
     return application_service.get_applications(
         db,
+        user_id=current_user.id,
         status_filter=status_filter,
         company_id=company_id,
         company=company,
@@ -121,6 +125,7 @@ def get_applications(
 def get_application(
     application_id: int,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> JobApplicationResponse:
     """
     Return one job application by ID.
@@ -132,6 +137,7 @@ def get_application(
     return application_service.require_application_by_id(
         db,
         application_id,
+        user_id=current_user.id,
     )
 
 
@@ -144,6 +150,7 @@ def update_application(
     application_id: int,
     application_data: JobApplicationUpdate,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> JobApplicationResponse:
     """
     Update an existing job application.
@@ -155,12 +162,14 @@ def update_application(
     application = application_service.require_application_by_id(
         db,
         application_id,
+        user_id=current_user.id,
     )
 
     return application_service.update_application(
         db,
         application,
         application_data,
+        user_id=current_user.id,
     )
 
 
@@ -172,6 +181,7 @@ def update_application(
 def delete_application(
     application_id: int,
     db: DatabaseSession,
+    current_user: CurrentUser,
 ) -> Response:
     """
     Delete an existing job application.
@@ -179,6 +189,7 @@ def delete_application(
     application = application_service.require_application_by_id(
         db,
         application_id,
+        user_id=current_user.id,
     )
 
     application_service.delete_application(
