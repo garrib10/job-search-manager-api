@@ -18,6 +18,7 @@ Each entry records a question about how the project works, the decision made, wh
 12. [How is the README kept accurate?](#how-is-the-readme-kept-accurate)
 13. [How is the app deployed and migrated on Railway?](#how-is-the-app-deployed-and-migrated-on-railway)
 14. [What stops the app from running with unsafe production settings?](#what-stops-the-app-from-running-with-unsafe-production-settings)
+15. [How are search, filters, sorting, and pagination tested under ownership?](#how-are-search-filters-sorting-and-pagination-tested-under-ownership)
 
 ---
 
@@ -446,4 +447,37 @@ In development, test, and CI, the app keeps running and logs a warning that name
 - **Changing `JWT_SECRET_KEY` logs everyone out**, because existing tokens no longer verify. Users simply log in again.
 - The check can't judge randomness. A long but guessable secret passes, so the generation command is suggested in every error.
 - Only the exact repository placeholders are recognized. Other weak values that meet the length rule aren't detected.
+
+---
+
+## How are search, filters, sorting, and pagination tested under ownership?
+
+**Decision**
+
+`tests/test_scoped_queries.py` builds a dataset for two users that **interleaves by ID and overlaps in content**:
+
+- both users have companies named "Acme" and "Globex";
+- they share job titles, locations, statuses, interview types, and identical interview times.
+
+Each test computes its expected result from the current user's own records and compares it with the API's answer. That covers:
+
+- search (titles and notes);
+- every application and interview filter;
+- the company-name filter;
+- sorting by title, salary, and date;
+- page boundaries and stable order on ties;
+- empty results for a user with no data, and an offset past the user's last record.
+
+**Why**
+
+- **The existing isolation tests couldn't catch mixed results.** In those tests the second user had no matching records, so a correct empty answer looked the same whether or not the query was scoped. With both users matching, a query that sorted, filtered, or paginated before scoping returns the wrong IDs or the wrong order.
+- **Same company names** test the one filter that joins another table (`company=` matches names); a join that ignored ownership would pull in the other user's "Acme" applications.
+- **Ties are deliberate:** every application has the same `date_saved` and two interviews share a time, so only the ID tie-breaker keeps pages stable. Removing the descending tie-breaker fails these tests.
+- **Checking the tests themselves:** removing owner scoping from the application, interview, or company list query fails 21, 11, and 2 of these tests respectively.
+
+**Trade-off**
+
+- Removing the *ascending* ID tie-breaker isn't detected: MySQL happens to return tied rows in ascending ID order for these tables, so the result is the same without it. The tie-breaker stays because that order isn't guaranteed.
+- The list endpoints have no total-count field, so there is no count to verify; if one is added, it needs the same two-user test.
+- The fixture creates 15 records per test. It's slower than a single-user setup, which is the price of realistic overlap.
 
