@@ -17,6 +17,7 @@ Each entry records a question about how the project works, the decision made, wh
 11. [How are dates, times, and text inputs validated?](#how-are-dates-times-and-text-inputs-validated)
 12. [How is the README kept accurate?](#how-is-the-readme-kept-accurate)
 13. [How is the app deployed and migrated on Railway?](#how-is-the-app-deployed-and-migrated-on-railway)
+14. [What stops the app from running with unsafe production settings?](#what-stops-the-app-from-running-with-unsafe-production-settings)
 
 ---
 
@@ -410,4 +411,39 @@ The new rules apply only to **requests**. Response models accept what's already 
 - Migrations that need input (`-x owner_email=...`) or that would break the still-running old version still need manual steps before the release (see `docs/database-migrations.md`).
 - The health check only confirms the process is serving HTTP; it doesn't check the database connection. A database outage is reported by failing requests, not by the deploy.
 - Upgrading Python means editing `.python-version`. CI follows automatically, and the change is reviewed like any other.
+
+---
+
+## What stops the app from running with unsafe production settings?
+
+**Decision**
+
+`get_settings()` loads settings and then checks them (`app/config.py`). With `APP_ENV=production`, the app **refuses to start** if any of these are true:
+
+- `JWT_SECRET_KEY` is shorter than the algorithm requires: 32 bytes for HS256, 48 for HS384, 64 for HS512.
+- `JWT_SECRET_KEY` is a placeholder from this repository (the `.env.example` value or the CI value).
+- `DB_PASSWORD` is empty.
+- `ACCESS_TOKEN_EXPIRE_MINUTES` is outside 1–1440.
+
+In every environment:
+
+- `JWT_ALGORITHM` must be `HS256`, `HS384`, or `HS512`.
+- Configuration errors (a missing variable, a non-numeric port) are reported **by variable name only**.
+
+In development, test, and CI, the app keeps running and logs a warning that names the variables production would refuse (names only).
+
+**Why**
+
+- **The signing secret protects every login.** Anyone who can guess or brute-force it can mint a token for any user. RFC 7518 requires an HMAC key at least as long as the hash output, which is where the 32/48/64-byte minimums come from. They're measured in bytes because that's what HMAC uses.
+- **Failing at startup is the safest moment.** `get_settings()` runs when the app, Alembic, and the scripts import their settings, so a bad production configuration stops Railway's pre-deploy migration and the new version never takes traffic. The previous version keeps running.
+- **Secrets stay out of logs.** Pydantic's validation errors include the submitted input, so a missing `DB_HOST` would have printed the password and signing secret into the deployment logs. Errors now list variable names and the requirement, without anything derived from a secret (not even its length), and `repr()` of the settings hides both secrets.
+- **Algorithm allow-list:** the app signs with a shared secret, so `none` or an asymmetric algorithm (RS256) can only be a misconfiguration. It's rejected everywhere.
+- **Warnings outside production** keep existing local setups and tests running while still pointing out what production would refuse. They log only variable names: CodeQL flags log lines fed by anything named like a secret (even a constant such as the generation command), and names are all a developer needs to find the problem.
+
+**Trade-off**
+
+- **A production deploy with a weak secret fails until the secret is fixed.** That's the point, but the variables must be checked before the first deploy that includes this change.
+- **Changing `JWT_SECRET_KEY` logs everyone out**, because existing tokens no longer verify. Users simply log in again.
+- The check can't judge randomness. A long but guessable secret passes, so the generation command is suggested in every error.
+- Only the exact repository placeholders are recognized. Other weak values that meet the length rule aren't detected.
 
