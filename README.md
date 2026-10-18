@@ -302,6 +302,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Create the database schema
+
+The app does not create tables on startup. Apply the migrations to the database configured in `.env`:
+
+```bash
+alembic upgrade head
+```
+
+If your database was created by an older version of this project, adopt it instead of upgrading; see [docs/database-migrations.md](docs/database-migrations.md).
+
 ### Run the application
 
 ```bash

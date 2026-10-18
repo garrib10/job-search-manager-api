@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from app.config import get_settings
-from app.database import Base, engine
 from app.exceptions import (
     ConflictException,
     NotFoundException,
@@ -11,7 +10,6 @@ from app.handlers import (
     not_found_exception_handler,
     validation_exception_handler,
 )
-from app.models import Company, Interview, JobApplication, User  # noqa: F401
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.companies import router as companies_router
@@ -22,10 +20,9 @@ from app.schemas.health import HealthResponse
 settings = get_settings()
 
 # WHY:
-# Importing the models registers their table metadata with SQLAlchemy's Base.
-# create_all() then creates any missing tables in the configured database.
-
-Base.metadata.create_all(bind=engine)
+# Importing the app must not touch the database. The schema is created and
+# changed only by explicit Alembic migrations (`alembic upgrade head`), never
+# automatically at import or startup. See docs/database-migrations.md.
 
 
 app = FastAPI(
