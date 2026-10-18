@@ -15,6 +15,7 @@ Each entry records a question about how the project works, the decision made, wh
 9. [How is each user's data kept separate?](#how-is-each-users-data-kept-separate)
 10. [What happens on delete, duplicates, and database conflicts?](#what-happens-on-delete-duplicates-and-database-conflicts)
 11. [How are dates, times, and text inputs validated?](#how-are-dates-times-and-text-inputs-validated)
+12. [How is the README kept accurate?](#how-is-the-readme-kept-accurate)
 
 ---
 
@@ -352,4 +353,32 @@ The new rules apply only to **requests**. Response models accept what's already 
 - **`GET /companies` now returns at most 20 companies by default.** Clients with more must page with `limit`/`offset`, as they already do for applications and interviews.
 - **Old timestamps are labelled UTC without proof.** This is documented rather than "fixed", because fixing it would mean guessing.
 - The byte limit is checked after the request body is parsed, so a very large note is still read into memory before being rejected; a request-size limit at the server or proxy is the place to cap that.
+
+---
+
+## How is the README kept accurate?
+
+**Decision**
+
+- The README describes **verified behavior only**:
+  - Endpoints require a bearer token, and each user only sees their own records.
+  - Another user's record returns 404.
+  - Company names aren't unique, and a company with applications can't be deleted.
+  - Job URLs are unique per user.
+  - Datetimes require an offset and are returned in UTC.
+- Test count and coverage come from an actual run of the full suite (213 tests, 99%) on the combined v0.2.0 changes.
+- "Production-ready" was removed. Claims about the live demo are limited to what it actually runs: the latest release on `main`.
+- The project structure section is generated from the tracked files, including `alembic/`, `docs/`, `scripts/`, and the `exceptions/` and `handlers/` packages, which earlier versions listed as single files.
+- Completed items (Alembic migrations, GitHub Actions CI) were removed from "Future Enhancements".
+- The coverage screenshot is labelled as being from v0.1.0 rather than replaced with an unverified image.
+
+**Why**
+
+- A reviewer reading the README and then the code should find the same thing. The v0.1.0 README claimed protected endpoints and duplicate-company prevention that didn't exist; overstated claims cost more credibility than missing features.
+- Counts and structure drift as code changes, so they are taken from the repository and a real test run rather than written from memory.
+
+**Trade-off**
+
+- The test count must be updated whenever tests are added. It's a number, not a badge, until CI reporting is added in v0.3.0.
+- The README describes `develop` once these changes are merged. The live demo only matches it after the next release; the README says so rather than claiming features are already deployed.
 
