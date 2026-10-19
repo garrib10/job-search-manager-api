@@ -20,3 +20,14 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/.railway"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    groups:
+      railway-sdk:
+        patterns:
+          - "*"
+

@@ -46,8 +46,8 @@ dependencies:
 deployment:
   - changed-files:
       - any-glob-to-any-file:
-          - "railway.json"
-          - "railway.toml"
+          - ".railway/**"
+          - ".python-version"
           - "Procfile"
 
 docs:

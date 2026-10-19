@@ -447,7 +447,7 @@ The suite covers:
 
 Current test suite:
 
-- **277 automated tests**
+- **281 automated tests**
 - **99% code coverage**
 
 Every pull request runs these checks in GitHub Actions against a disposable MySQL 8.4 database, alongside CodeQL, Bandit, and Dependency Review.
@@ -460,10 +460,24 @@ The API is deployed on [Railway](https://railway.com) from the `main` branch. Th
 
 | File | Purpose |
 | --- | --- |
-| `railway.json` | Start command (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`), pre-deploy command (`alembic upgrade head`), and health check (`/health`) |
+| `.railway/railway.ts` | Railway Infrastructure as Code for the API service: start command (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`), pre-deploy command (`alembic upgrade head`, 300-second timeout), health check (`/health`), builder, and source branch |
+| `.railway/package.json` | Pins the Railway SDK that `railway config` uses to read `railway.ts`. Kept out of the repository root so Railway still builds a Python app |
 | `.python-version` | Python 3.12, also used by CI |
 
 On each deploy, Railway runs the migrations **before** switching traffic to the new version. If a migration fails, the deploy stops and the previous version keeps running. Migrations that need manual input are described in [docs/database-migrations.md](docs/database-migrations.md#migrations-on-deploy-railway).
+
+### Changing deployment settings
+
+Railway doesn't read `.railway/` during deploys; changes take effect when they're applied with the [Railway CLI](https://docs.railway.com/cli). After a change to `.railway/railway.ts` is merged:
+
+```bash
+cd .railway && npm ci && cd ..      # install the pinned Railway SDK (Node 22+)
+railway link                        # once: select the project and the production environment
+railway config plan                 # read-only preview
+railway config apply                # apply the reviewed changes
+```
+
+Check that the plan says `0 to destroy` before applying. The file declares `partial = "job-search-manager-api"`, so it only manages the API service, never the MySQL database, and `variables.managed: false` leaves environment variables in Railway.
 
 ### Required production settings
 
