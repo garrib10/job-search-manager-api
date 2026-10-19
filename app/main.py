@@ -16,6 +16,7 @@ from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.companies import router as companies_router
 from app.routers.interviews import router as interviews_router
+from app.routers.stats import router as stats_router
 from app.schemas.health import HealthResponse
 
 
@@ -70,6 +71,7 @@ app.add_exception_handler(
 app.include_router(companies_router)
 app.include_router(applications_router)
 app.include_router(interviews_router)
+app.include_router(stats_router)
 app.include_router(auth_router)
 
 

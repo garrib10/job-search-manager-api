@@ -61,6 +61,11 @@ The live demo runs the latest release from the `main` branch. Work merged into `
 - Each user only sees and changes their own records; another user's record returns `404 Not Found`, the same as a missing one
 - Applications can only be filed under the user's own companies, and interviews under the user's own applications
 
+### Job Search Summary
+
+- `GET /stats/summary` returns your applications by status, interviews by outcome, interviews in the next 7 days, and applications not updated for 14+ days
+- Every count covers only your own records, and every status and outcome is listed (0 when empty)
+
 ### Search & Filtering
 
 Job Applications
@@ -272,7 +277,13 @@ Screenshot from v0.1.0 (70 tests). The current figures are under [Testing](#test
 | PUT    | `/interviews/{id}` |
 | DELETE | `/interviews/{id}` |
 
-All company, application, and interview endpoints require `Authorization: Bearer <JWT>` and only work with the logged-in user's records.
+### Stats
+
+| Method | Endpoint         |
+| ------ | ---------------- |
+| GET    | `/stats/summary` |
+
+All company, application, interview, and stats endpoints require `Authorization: Bearer <JWT>` and only work with the logged-in user's records.
 
 ---
 
@@ -327,6 +338,26 @@ Authorization: Bearer <JWT>
 ```
 
 The response returns the time in UTC: `"scheduled_at": "2026-11-02T15:00:00Z"`.
+
+### Job Search Summary
+
+```http
+GET /stats/summary
+Authorization: Bearer <JWT>
+```
+
+```json
+{
+  "generated_at": "2026-11-01T12:00:00Z",
+  "applications_by_status": {"saved": 2, "applied": 5, "interviewing": 1, "offer": 0, "rejected": 1, "withdrawn": 0},
+  "interviews_by_outcome": {"pending": 2, "advanced": 1, "rejected": 0, "offer": 0, "withdrawn": 0},
+  "upcoming_interviews": {"count": 1, "window_start": "2026-11-01T12:00:00Z", "window_end": "2026-11-08T12:00:00Z"},
+  "stale_applications": {"count": 3, "days": 14, "not_updated_since": "2026-10-18T12:00:00Z"}
+}
+```
+
+- **upcoming_interviews:** scheduled from `window_start` (inclusive) to `window_end` (exclusive), excluding cancelled interviews.
+- **stale_applications:** applications whose record was last updated at or before `not_updated_since`. Adding an interview doesn't update the application.
 
 ---
 
@@ -447,7 +478,7 @@ The suite covers:
 
 Current test suite:
 
-- **281 automated tests**
+- **300 automated tests**
 - **99% code coverage**
 
 Every pull request runs these checks in GitHub Actions against a disposable MySQL 8.4 database, alongside CodeQL, Bandit, and Dependency Review.
