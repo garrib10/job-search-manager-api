@@ -1,0 +1,8 @@
+{
+  "name": "job-search-manager-api-railway-iac",
+  "private": true,
+  "description": "Railway Infrastructure as Code SDK for .railway/railway.ts. Kept out of the repository root so Railpack still builds the Python app.",
+  "devDependencies": {
+    "railway": "3.12.0"
+  }
+}
