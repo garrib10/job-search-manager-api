@@ -3,6 +3,7 @@ from app.services import (
     auth_service,
     company_service,
     interview_service,
+    stats_service,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "auth_service",
     "company_service",
     "interview_service",
+    "stats_service",
 ]

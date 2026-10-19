@@ -21,6 +21,7 @@ Each entry records a question about how the project works, the decision made, wh
 15. [How are search, filters, sorting, and pagination tested under ownership?](#how-are-search-filters-sorting-and-pagination-tested-under-ownership)
 16. [How does a new developer get from a clone to passing tests?](#how-does-a-new-developer-get-from-a-clone-to-passing-tests)
 17. [Why does Railway configuration live in Infrastructure as Code?](#why-does-railway-configuration-live-in-infrastructure-as-code)
+18. [What does the job search summary count, and how?](#what-does-the-job-search-summary-count-and-how)
 
 ---
 
@@ -544,4 +545,40 @@ This supersedes the `railway.json` part of "How is the app deployed and migrated
 - **Node 22+ is needed** to run `railway config` locally, in an otherwise Python project.
 - **Dashboard edits to the API service drift from the file.** The next plan shows them as changes to revert, so settings should be changed in the file.
 - The tests read `railway.ts` as text, so they catch removed or changed settings, but not TypeScript errors; `railway config plan` is what evaluates the file.
+
+---
+
+## What does the job search summary count, and how?
+
+**Decision**
+
+`GET /stats/summary` returns four figures for the authenticated user, all evaluated at one time, `generated_at`:
+
+| Figure | Definition |
+| --- | --- |
+| `applications_by_status` | Count of the user's applications per status. Every status is listed, 0 when none |
+| `interviews_by_outcome` | Count of interviews on the user's applications per outcome. Every outcome is listed. Interviews without a decision count as `pending` (the column is required and defaults to `pending`, so there is no "missing" outcome) |
+| `upcoming_interviews` | Interviews with `now ≤ scheduled_at < now + 7 days`, excluding `cancelled` ones |
+| `stale_applications` | Applications with `updated_at ≤ now − 14 days` |
+
+- `now` comes from a `utc_now` dependency: the current UTC time, truncated to whole seconds. Each request reads it once.
+- The response includes the window boundaries (`window_start`, `window_end`, `not_updated_since`) so the counts can be checked.
+- Each figure is a single database `GROUP BY` or `COUNT` query filtered by owner. Interviews are scoped by joining to their application, as in the other interview endpoints.
+
+**Why**
+
+- **Database aggregation** keeps the endpoint fast and bounded no matter how many records a user has; nothing is loaded into Python.
+- **Zero-filled keys** give clients a fixed shape: a missing status never means anything different from 0.
+- **A half-open 7-day window** (`now` included, `now + 7 days` excluded) means consecutive windows never count an interview twice. Cancelled interviews are excluded because they won't happen; rescheduled and scheduled ones still count.
+- **"14 or more days" is inclusive**, so an application last updated exactly 14 days ago is stale.
+- **`updated_at` is reliable for this.** It's required, set by MySQL on insert, refreshed by SQLAlchemy whenever the application changes, and stored in UTC (connections use UTC since v0.2.0, and production's server runs in UTC). A test confirms an update makes a stale application fresh again.
+- **One injectable clock** keeps the four figures consistent within a request, and lets the tests freeze time and place records exactly at, before, and after each boundary.
+- **Seconds precision** matches MySQL `DATETIME`, so "exactly 14 days ago" compares cleanly.
+
+**Trade-off**
+
+- "Stale" means the **application record** hasn't changed. Adding an interview or editing a company doesn't refresh it, and neither does a `PUT` that changes nothing.
+- Stale counts include closed applications (offer, rejected, withdrawn). They are listed per status in the same response, so a client can interpret them.
+- No new indexes were added. The queries filter by `user_id`, which is already indexed, and the counts are per user; an index on `updated_at` or `scheduled_at` can be added if profiling ever shows a need.
+- The windows use the server's UTC time, not the user's local time zone.
 
