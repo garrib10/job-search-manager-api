@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import get_settings
 from app.database import CONNECT_ARGS, Base, get_db
 from app.main import app
-from app.models import Company, Interview, JobApplication, User
+from app.models import Company, FollowUp, Interview, JobApplication, User
 from app.schemas import UserCreate
 from app.security import create_access_token
 from app.services import auth_service
@@ -78,6 +78,7 @@ def clean_database() -> Generator[None, None, None]:
     yield
 
     with test_engine.begin() as connection:
+        connection.execute(FollowUp.__table__.delete())
         connection.execute(Interview.__table__.delete())
         connection.execute(JobApplication.__table__.delete())
         connection.execute(Company.__table__.delete())

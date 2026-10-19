@@ -61,6 +61,13 @@ The live demo runs the latest release from the `main` branch. Work merged into `
 - Each user only sees and changes their own records; another user's record returns `404 Not Found`, the same as a missing one
 - Applications can only be filed under the user's own companies, and interviews under the user's own applications
 
+### Follow-ups
+
+- Add to-dos to an application (for example, "Email the recruiter") with a due date
+- Mark them completed or reopen them; the server records when each was completed
+- Filter by `open`, `completed`, `overdue` (open and due before today), or `upcoming` (open and due within the next 7 days, including today), using the UTC date
+- Deleting an application deletes its follow-ups
+
 ### Job Search Summary
 
 - `GET /stats/summary` returns your applications by status, interviews by outcome, interviews in the next 7 days, and applications not updated for 14+ days
@@ -277,13 +284,23 @@ Screenshot from v0.1.0 (70 tests). The current figures are under [Testing](#test
 | PUT    | `/interviews/{id}` |
 | DELETE | `/interviews/{id}` |
 
+### Follow-ups
+
+| Method | Endpoint           |
+| ------ | ------------------ |
+| POST   | `/follow-ups`      |
+| GET    | `/follow-ups`      |
+| GET    | `/follow-ups/{id}` |
+| PUT    | `/follow-ups/{id}` |
+| DELETE | `/follow-ups/{id}` |
+
 ### Stats
 
 | Method | Endpoint         |
 | ------ | ---------------- |
 | GET    | `/stats/summary` |
 
-All company, application, interview, and stats endpoints require `Authorization: Bearer <JWT>` and only work with the logged-in user's records.
+All company, application, interview, follow-up, and stats endpoints require `Authorization: Bearer <JWT>` and only work with the logged-in user's records.
 
 ---
 
@@ -338,6 +355,39 @@ Authorization: Bearer <JWT>
 ```
 
 The response returns the time in UTC: `"scheduled_at": "2026-11-02T15:00:00Z"`.
+
+### Add and Complete a Follow-up
+
+```http
+POST /follow-ups
+Authorization: Bearer <JWT>
+```
+
+```json
+{
+  "application_id": 1,
+  "title": "Email the recruiter",
+  "due_date": "2026-11-12"
+}
+```
+
+To complete it, send the whole follow-up back with `"completed": true` (or `false` to reopen it):
+
+```http
+PUT /follow-ups/{id}
+Authorization: Bearer <JWT>
+```
+
+```json
+{
+  "application_id": 1,
+  "title": "Email the recruiter",
+  "due_date": "2026-11-12",
+  "completed": true
+}
+```
+
+List what's overdue with `GET /follow-ups?status_filter=overdue`.
 
 ### Job Search Summary
 
@@ -478,7 +528,7 @@ The suite covers:
 
 Current test suite:
 
-- **300 automated tests**
+- **328 automated tests**
 - **99% code coverage**
 
 Every pull request runs these checks in GitHub Actions against a disposable MySQL 8.4 database, alongside CodeQL, Bandit, and Dependency Review.
