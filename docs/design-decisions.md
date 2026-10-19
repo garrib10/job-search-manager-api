@@ -16,6 +16,10 @@ Each entry records a question about how the project works, the decision made, wh
 10. [What happens on delete, duplicates, and database conflicts?](#what-happens-on-delete-duplicates-and-database-conflicts)
 11. [How are dates, times, and text inputs validated?](#how-are-dates-times-and-text-inputs-validated)
 12. [How is the README kept accurate?](#how-is-the-readme-kept-accurate)
+13. [How is the app deployed and migrated on Railway?](#how-is-the-app-deployed-and-migrated-on-railway)
+14. [What stops the app from running with unsafe production settings?](#what-stops-the-app-from-running-with-unsafe-production-settings)
+15. [How are search, filters, sorting, and pagination tested under ownership?](#how-are-search-filters-sorting-and-pagination-tested-under-ownership)
+16. [How does a new developer get from a clone to passing tests?](#how-does-a-new-developer-get-from-a-clone-to-passing-tests)
 
 ---
 
@@ -381,4 +385,132 @@ The new rules apply only to **requests**. Response models accept what's already 
 
 - The test count must be updated whenever tests are added. It's a number, not a badge, until CI reporting is added in v0.3.0.
 - The README describes `develop` once these changes are merged. The live demo only matches it after the next release; the README says so rather than claiming features are already deployed.
+
+---
+
+## How is the app deployed and migrated on Railway?
+
+**Decision**
+
+- `railway.json` in the repository defines how Railway runs the app:
+  - Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+  - Pre-deploy command: `alembic upgrade head`.
+  - Health check path: `/health`.
+- `.python-version` pins Python **3.12**. Railway's builder reads it, and both CI jobs read the same file (`setup-python`'s `python-version-file`), so production and CI use the same minor version.
+- The builder isn't pinned in `railway.json`; the service keeps whichever builder it already uses.
+
+**Why**
+
+- **Settings in the repository are reviewed and versioned.** Before this, the start command lived only in the Railway dashboard, where a change leaves no history and can't be reviewed in a pull request. Railway applies `railway.json` on every deploy and uses it in place of the dashboard values.
+- **Migrations run before traffic switches.** Railway runs the pre-deploy command in the new build, with the service's environment variables, before starting it. If the migration fails, the deploy stops and the previous version keeps serving. This replaces the manual `alembic upgrade head` step from the v0.2.0 release.
+- **`$PORT` and `0.0.0.0`:** Railway assigns the port and health-checks it, and the server must listen on all interfaces to be reachable inside Railway's network. The start command runs in a shell for Railpack builds, so `$PORT` expands.
+- **The Python pin closes a gap.** Without a pin, Railpack defaults to Python 3.13 while CI tests on 3.12, so production could run a version nothing was tested on. One file now drives both.
+- **Not pinning the builder** avoids changing how the existing service builds as a side effect of this change. Both builders Railway offers for this repository (Railpack and Nixpacks) honor `.python-version`.
+
+**Trade-off**
+
+- **A failed migration blocks the deploy.** That's intended, but it means a broken migration stops a release until it's fixed. The pre-deploy logs in Railway show why.
+- Migrations that need input (`-x owner_email=...`) or that would break the still-running old version still need manual steps before the release (see `docs/database-migrations.md`).
+- The health check only confirms the process is serving HTTP; it doesn't check the database connection. A database outage is reported by failing requests, not by the deploy.
+- Upgrading Python means editing `.python-version`. CI follows automatically, and the change is reviewed like any other.
+
+---
+
+## What stops the app from running with unsafe production settings?
+
+**Decision**
+
+`get_settings()` loads settings and then checks them (`app/config.py`). With `APP_ENV=production`, the app **refuses to start** if any of these are true:
+
+- `JWT_SECRET_KEY` is shorter than the algorithm requires: 32 bytes for HS256, 48 for HS384, 64 for HS512.
+- `JWT_SECRET_KEY` is a placeholder from this repository (the `.env.example` value or the CI value).
+- `DB_PASSWORD` is empty.
+- `ACCESS_TOKEN_EXPIRE_MINUTES` is outside 1–1440.
+
+In every environment:
+
+- `JWT_ALGORITHM` must be `HS256`, `HS384`, or `HS512`.
+- Configuration errors (a missing variable, a non-numeric port) are reported **by variable name only**.
+
+In development, test, and CI, the app keeps running and logs a warning that names the variables production would refuse (names only).
+
+**Why**
+
+- **The signing secret protects every login.** Anyone who can guess or brute-force it can mint a token for any user. RFC 7518 requires an HMAC key at least as long as the hash output, which is where the 32/48/64-byte minimums come from. They're measured in bytes because that's what HMAC uses.
+- **Failing at startup is the safest moment.** `get_settings()` runs when the app, Alembic, and the scripts import their settings, so a bad production configuration stops Railway's pre-deploy migration and the new version never takes traffic. The previous version keeps running.
+- **Secrets stay out of logs.** Pydantic's validation errors include the submitted input, so a missing `DB_HOST` would have printed the password and signing secret into the deployment logs. Errors now list variable names and the requirement, without anything derived from a secret (not even its length), and `repr()` of the settings hides both secrets.
+- **Algorithm allow-list:** the app signs with a shared secret, so `none` or an asymmetric algorithm (RS256) can only be a misconfiguration. It's rejected everywhere.
+- **Warnings outside production** keep existing local setups and tests running while still pointing out what production would refuse. They log only variable names: CodeQL flags log lines fed by anything named like a secret (even a constant such as the generation command), and names are all a developer needs to find the problem.
+
+**Trade-off**
+
+- **A production deploy with a weak secret fails until the secret is fixed.** That's the point, but the variables must be checked before the first deploy that includes this change.
+- **Changing `JWT_SECRET_KEY` logs everyone out**, because existing tokens no longer verify. Users simply log in again.
+- The check can't judge randomness. A long but guessable secret passes, so the generation command is suggested in every error.
+- Only the exact repository placeholders are recognized. Other weak values that meet the length rule aren't detected.
+
+---
+
+## How are search, filters, sorting, and pagination tested under ownership?
+
+**Decision**
+
+`tests/test_scoped_queries.py` builds a dataset for two users that **interleaves by ID and overlaps in content**:
+
+- both users have companies named "Acme" and "Globex";
+- they share job titles, locations, statuses, interview types, and identical interview times.
+
+Each test computes its expected result from the current user's own records and compares it with the API's answer. That covers:
+
+- search (titles and notes);
+- every application and interview filter;
+- the company-name filter;
+- sorting by title, salary, and date;
+- page boundaries and stable order on ties;
+- empty results for a user with no data, and an offset past the user's last record.
+
+**Why**
+
+- **The existing isolation tests couldn't catch mixed results.** In those tests the second user had no matching records, so a correct empty answer looked the same whether or not the query was scoped. With both users matching, a query that sorted, filtered, or paginated before scoping returns the wrong IDs or the wrong order.
+- **Same company names** test the one filter that joins another table (`company=` matches names); a join that ignored ownership would pull in the other user's "Acme" applications.
+- **Ties are deliberate:** every application has the same `date_saved` and two interviews share a time, so only the ID tie-breaker keeps pages stable. Removing the descending tie-breaker fails these tests.
+- **Checking the tests themselves:** removing owner scoping from the application, interview, or company list query fails 21, 11, and 2 of these tests respectively.
+
+**Trade-off**
+
+- Removing the *ascending* ID tie-breaker isn't detected: MySQL happens to return tied rows in ascending ID order for these tables, so the result is the same without it. The tie-breaker stays because that order isn't guaranteed.
+- The list endpoints have no total-count field, so there is no count to verify; if one is added, it needs the same two-user test.
+- The fixture creates 15 records per test. It's slower than a single-user setup, which is the price of realistic overlap.
+
+---
+
+## How does a new developer get from a clone to passing tests?
+
+**Decision**
+
+The README's **Local Development** section is one ordered path:
+
+1. Prerequisites: Python 3.12 from `.python-version`, MySQL 8.4+.
+2. Clone, virtual environment, `pip install`.
+3. SQL to create the app database, a separate test database, and a non-root user.
+4. `.env` from `.env.example`, with a table of every variable.
+5. `alembic upgrade head`.
+6. `uvicorn` and the Swagger login flow.
+
+**Testing** lists the same commands CI runs: pytest with coverage, Ruff at CI's pinned version, and the migration checks. **Deployment** documents `railway.json`, the pre-deploy migration, and the production settings that block startup. A CI badge links to the actual `ci.yml` workflow on `main`.
+
+**Why**
+
+- **The steps were there but incomplete.** The previous instructions said "install and run" but never covered creating the databases, filling in `.env`, or the test database the suite requires. A new developer would hit the test-database guard or a missing-table error with no explanation.
+- **Two databases are explained up front** because the guard refuses to run tests against `DB_NAME`, a deliberate safety rule that looks like a bug if it isn't stated.
+- **Commands match CI** so a passing local run means a passing pull request, including the Ruff version, which isn't in `requirements.txt`.
+- **Production rules belong next to deployment:** someone setting up Railway needs to know that a short `JWT_SECRET_KEY` stops startup before they deploy, not from a failed deploy log.
+- **The path was followed from a fresh clone** in a scratch folder with a new virtual environment (see the #27 pull request for exactly what was and wasn't exercised).
+
+**Trade-off**
+
+- The README is longer. The quick path is still steps 1–5, and the details are in tables that can be skimmed.
+- Database creation needs MySQL `root`, which varies by installation (Homebrew, the Oracle installer, Docker); the README gives the SQL rather than installer-specific instructions.
+- The test count in the README must be updated as tests are added.
+- Ruff stays outside `requirements.txt` (the optional dependency split was skipped), so it's installed separately.
 
