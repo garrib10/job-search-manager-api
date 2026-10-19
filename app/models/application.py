@@ -18,6 +18,7 @@ from app.enums import ApplicationStatus, WorkArrangement
 
 if TYPE_CHECKING:
     from app.models.company import Company
+    from app.models.follow_up import FollowUp
     from app.models.interview import Interview
     from app.models.user import User
 
@@ -155,6 +156,12 @@ class JobApplication(Base):
     # lets the database's ON DELETE CASCADE remove the rest without
     # loading them first.
     interviews: Mapped[list["Interview"]] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    follow_ups: Mapped[list["FollowUp"]] = relationship(
         back_populates="application",
         cascade="all, delete-orphan",
         passive_deletes=True,

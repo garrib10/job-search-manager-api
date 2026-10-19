@@ -22,6 +22,7 @@ Each entry records a question about how the project works, the decision made, wh
 16. [How does a new developer get from a clone to passing tests?](#how-does-a-new-developer-get-from-a-clone-to-passing-tests)
 17. [Why does Railway configuration live in Infrastructure as Code?](#why-does-railway-configuration-live-in-infrastructure-as-code)
 18. [What does the job search summary count, and how?](#what-does-the-job-search-summary-count-and-how)
+19. [How are follow-ups stored, owned, and filtered?](#how-are-follow-ups-stored-owned-and-filtered)
 
 ---
 
@@ -582,3 +583,47 @@ This supersedes the `railway.json` part of "How is the app deployed and migrated
 - No new indexes were added. The queries filter by `user_id`, which is already indexed, and the counts are per user; an index on `updated_at` or `scheduled_at` can be added if profiling ever shows a need.
 - The windows use the server's UTC time, not the user's local time zone.
 
+
+
+---
+
+## How are follow-ups stored, owned, and filtered?
+
+**Decision**
+
+- **Storage:** a new `follow_ups` table (migration `c539960a9f2f`) holds:
+  - `title` (required, trimmed, up to 200 characters);
+  - `due_date` (a **date**);
+  - `completed` (defaults to false);
+  - `completed_at` (set by the server);
+  - timestamps, and `application_id`.
+- **Ownership:** follow-ups have **no `user_id`**; they belong to whoever owns their application, like interviews. Every query joins to the application and filters by owner. Creating a follow-up on, or moving one to, another user's application returns 404, as do another user's follow-ups.
+- **Lifecycle:**
+  - Created open.
+  - `PUT` replaces the follow-up, and `completed` is **required** in the body.
+  - Becoming completed sets `completed_at` to the request's time; completing an already-completed follow-up keeps the original time; reopening clears it.
+  - `DELETE` removes it.
+- **Deleting an application deletes its follow-ups:** ORM `cascade="all, delete-orphan"` and `ON DELETE CASCADE`, the same rule as interviews. A company with applications still can't be deleted.
+- **Filters** (`status_filter`), with *today* being the current UTC date from the `utc_now` clock:
+  - `open`: not completed.
+  - `completed`: completed.
+  - `overdue`: not completed and `due_date < today`.
+  - `upcoming`: not completed and `today ≤ due_date < today + 7 days` (today plus the next 6 days).
+- **Lists** use the usual `limit` (1–100, default 20) and `offset`, ordered by `due_date`, then `id`.
+
+**Why**
+
+- **A date, not a timestamp:** follow-ups are planned by day ("email them Thursday"), and the project already stores day-level values as dates (`date_saved`, `date_applied`). A timestamp would force clients to invent a time of day.
+- **Ownership through the application** keeps one source of truth: a follow-up can't disagree with its application about who owns it, and the same join pattern already protects interviews.
+- **Requiring `completed` on `PUT`** means a client that edits the title can't silently reopen a finished follow-up by leaving the field out. A separate complete/reopen endpoint would add API surface without adding capability.
+- **The server sets `completed_at`,** so the record shows when it was actually done; clients can't backdate it.
+- **Completed follow-ups are never overdue or upcoming,** because those filters answer "what do I still need to do?".
+- **Cascading with the application** matches interviews: a follow-up means nothing without its application.
+
+**Trade-off**
+
+- **"Today" is the UTC date.** For users west of UTC, the day rolls over in the evening (for example, 7 p.m. in New York), so something due "today" can become overdue a few hours early in local time. Supporting per-user time zones would need a stored user preference.
+- **`upcoming` is a fixed 7-day window;** follow-ups due further out appear only under `open`.
+- **No reminders are sent.** Follow-ups are tracked in the API only, with no email, notifications, or background jobs.
+- **Downgrading `c539960a9f2f` drops the table and every follow-up in it.**
+- No index on `due_date` was added; filtering runs within one user's follow-ups, which is already narrowed by the application join.

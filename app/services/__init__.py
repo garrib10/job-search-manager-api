@@ -2,6 +2,7 @@ from app.services import (
     application_service,
     auth_service,
     company_service,
+    follow_up_service,
     interview_service,
     stats_service,
 )
@@ -10,6 +11,7 @@ __all__ = [
     "application_service",
     "auth_service",
     "company_service",
+    "follow_up_service",
     "interview_service",
     "stats_service",
 ]
