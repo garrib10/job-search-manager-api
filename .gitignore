@@ -21,3 +21,5 @@ htmlcov/
 
 # Operating system files
 .DS_Store
+# Railway IaC SDK (installed in .railway/)
+node_modules/

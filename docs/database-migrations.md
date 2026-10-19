@@ -248,7 +248,7 @@ Before you start:
 
 ## Migrations on deploy (Railway)
 
-`railway.json` sets a **pre-deploy command**, `alembic upgrade head`. On every deploy, Railway builds the new version and runs that command with the service's environment variables **before** switching traffic to it:
+The Railway service runs a **pre-deploy command**, `alembic upgrade head` (defined in `.railway/railway.ts`, with a 300-second timeout). On every deploy, Railway builds the new version and runs that command with the service's environment variables **before** switching traffic to it:
 
 - If it succeeds (exit code 0), the new version starts. When the database is already at the latest revision, it does nothing.
 - If it fails (non-zero exit code), **the deployment stops** and the previous version keeps running. The command is not retried. Check the deployment's pre-deploy logs, fix the cause, and redeploy.
