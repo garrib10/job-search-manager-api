@@ -112,7 +112,7 @@ Companies
 
 ### Automated Testing
 
-- 213 automated tests, 99% code coverage
+- 328 automated tests, 99% code coverage
 - Dedicated MySQL test database, with a guard that refuses to reset any database whose name lacks `test` or matches `DB_NAME`
 - CRUD, validation, and end-to-end workflow tests
 - Authentication and cross-user isolation tests
